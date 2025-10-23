@@ -47,7 +47,6 @@ class QueryWorkflow:
             search_city_with_better_weather,
         ]
 
-        # Create the agent with higher recursion limit
         # pyrefly: ignore
         agent = create_react_agent(
             model=self.model,
@@ -132,37 +131,29 @@ class QueryWorkflow:
         weather_comparison = state["weather_comparison"]
 
         # Create the message content
-        message_content = (
+        user_prompt = (
             f"Find a city that likely has better weather than the city depicted as the victor in the weather comparison report. "
             f"The weather comparison report is given here: {weather_comparison}. "
             "You can use your tools to research. Return only the city name."
         )
 
-        # For Vertex AI compatibility, we need to ensure the message format is correct
-        from langchain_core.messages import HumanMessage
-        
-        # Create a proper HumanMessage object
-        message = HumanMessage(content=message_content)
-        
-        # The agent expects a dict with 'messages' and any other state keys
-        agent_input = {
-            "messages": [message],
-            **state,  # include any existing keys (like city_1, city_2, etc.)
-        }
+        result = self.agent_find_better_city.invoke(
+            {
+                "messages": [
+                    {"role": "user", "content": user_prompt},
+                ]
+            },
+            config=get_runnable_config(),
+        )
+        messages = result.get("messages", [])
+        if len(messages) < 2:
+            raise Exception("Invalid response from Chef agent")
 
-        try:
-            # Run the agent
-            agent_result = self.agent_find_better_city.invoke(agent_input, config=get_runnable_config())
+        state["better_city"] = messages[-1].content
+        return state
 
-            # agent_result is itself a state dict — so extract what you need from it
-            final_message = agent_result["messages"][-1]["content"]
-            state["better_city"] = final_message
-        except Exception as e:
-            logger.error(f"Agent invocation failed: {e}")
-            # Fallback: just return a simple response
-            state["better_city"] = "Unable to find a better city due to API error"
 
-        return state  # ✅ must return dict
+
 
 
 def query_llm(city_1: str, city_2: str):
