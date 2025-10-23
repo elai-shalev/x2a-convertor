@@ -12,6 +12,7 @@ from src.init import init_project
 from src.exporters.migrate import migrate_module
 from src.validate import validate_module
 from src.inputs.analyze import analyze_project
+from src.query import query_llm
 
 
 def format_context(logger, method_name, event_dict):
@@ -143,6 +144,14 @@ def migrate(
 def validate(module_name) -> None:
     """Validate migrated module against original configuration"""
     validate_module(module_name)
+
+
+@cli.command()
+@click.argument("city_1")
+@click.argument("city_2")
+def query(city_1, city_2) -> None:
+    """Query an llm within a workflow"""
+    query_llm(city_1, city_2)
 
 
 if __name__ == "__main__":
