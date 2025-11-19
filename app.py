@@ -106,6 +106,29 @@ def validate(module_name) -> None:
     validate_module(module_name)
 
 
+@cli.command()
+@click.argument("module_name")
+@click.option(
+    "--role-path",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True),
+    default=".",
+    callback=change_dir_callback,
+    is_eager=True,
+    help="Role path to publish",
+)
+@click.option(
+    "--github-repository-url",
+    help="GitHub repository URL",
+)
+@click.option(
+    "--github-branch",
+    default="main",
+    help="GitHub branch",
+)
+def publish(module_name, role_path, github_repository_url, github_branch) -> None:
+    """Export migrated module to Ansible Automation Platform"""
+    publish_role(module_name, role_path, github_repository_url, github_branch)
+
 if __name__ == "__main__":
     load_dotenv()
     setup_logging()
