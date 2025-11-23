@@ -17,68 +17,37 @@ class GenerateAAPConfigInput(BaseModel):
     """Input schema for generating AAP configuration files."""
 
     config_type: str = Field(
-        description=(
-            "Type of configuration to generate: "
-            "'playbook', 'job_template', or 'inventory'"
-        )
+        description="Type: 'playbook', 'job_template', or 'inventory'"
     )
-    file_path: str = Field(;
-        description="Path where the configuration file should be written"
-    )
-    # Playbook-specific fields
-    name: str = Field(
-        description="Name/description of the playbook, job template, or inventory"
-    )
+    file_path: str = Field(description="Output file path")
+    name: str = Field(description="Name/description")
     role_name: str = Field(
-        default="",
-        description=(
-            "Name of the role (required for playbook and job_template, "
-            "optional for inventory)"
-        ),
+        default="", description="Role name (playbook/job_template)"
     )
-    hosts: str = Field(
-        default="all",
-        description="Target hosts for playbook (default: 'all')",
-    )
+    hosts: str = Field(default="all", description="Target hosts (playbook)")
     become: bool = Field(
-        default=False,
-        description="Whether to use become/privilege escalation for playbook",
+        default=False, description="Use privilege escalation (playbook)"
     )
     vars: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Dictionary of variables to pass to the role (playbook only)",
+        default_factory=dict, description="Variables (playbook)"
     )
-    # Job template-specific fields
     playbook_path: str = Field(
-        default="",
-        description=(
-            "Path to the playbook file for job_template "
-            "(relative to project root)"
-        ),
+        default="", description="Playbook path (job_template)"
     )
     inventory: str = Field(
-        default="",
-        description="Inventory name or path for job_template",
+        default="", description="Inventory name/path (job_template)"
     )
     description: str = Field(
-        default="",
-        description="Description for job_template or inventory",
+        default="", description="Description (job_template/inventory)"
     )
     extra_vars: str = Field(
-        default="",
-        description="Extra variables in YAML format for job_template (optional)",
+        default="", description="Extra vars YAML (job_template)"
     )
-    # Inventory-specific fields
     inventory_hosts: list[str] = Field(
-        default_factory=list,
-        description="List of hostnames or IP addresses for inventory",
+        default_factory=list, description="Hosts (inventory)"
     )
     groups: dict[str, list[str]] = Field(
-        default_factory=dict,
-        description=(
-            "Dictionary of group names to lists of hosts for inventory "
-            "(e.g., {'webservers': ['web1', 'web2']})"
-        ),
+        default_factory=dict, description="Groups (inventory)"
     )
 
 
@@ -94,12 +63,8 @@ class GenerateAAPConfigTool(BaseTool):
 
     name: str = "generate_aap_config"
     description: str = (
-        "Generate AAP configuration files: playbook, job_template, or inventory. "
-        "For 'playbook': creates an Ansible playbook YAML that uses a role. "
-        "For 'job_template': creates an AAP job template YAML configuration. "
-        "For 'inventory': creates an AAP inventory YAML configuration. "
-        "Specify config_type as 'playbook', 'job_template', or 'inventory'. "
-        "The tool will use the appropriate fields based on the config_type."
+        "Generate AAP config: playbook, job_template, or inventory. "
+        "Set config_type and required fields for that type."
     )
     args_schema: dict[str, Any] | type[BaseModel] | None = GenerateAAPConfigInput
 

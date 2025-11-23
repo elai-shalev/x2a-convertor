@@ -35,11 +35,10 @@ You have access to these tools:
 
 **Configuration Generation Tools:**
 
-- `generate_aap_config`: Generate AAP configuration files (playbook, job_template, or inventory)
-  - Requires: config_type ('playbook', 'job_template', or 'inventory'), file_path, name
-  - For playbook: also requires role_name, hosts (optional), become (optional), vars (optional)
-  - For job_template: also requires playbook_path, inventory, role_name (optional), description (optional), extra_vars (optional)
-  - For inventory: also requires inventory_hosts (optional), groups (optional), description (optional)
+- `generate_playbook_yaml`: Generate Ansible playbook YAML that uses a role
+  - Requires: file_path, name, role_name, hosts (optional), become (optional), vars (optional)
+- `generate_job_template_yaml`: Generate AAP job template YAML configuration
+  - Requires: file_path, name, playbook_path, inventory, role_name (optional), description (optional), extra_vars (optional)
 - `generate_github_actions_workflow`: Generate GitHub Actions workflow for Ansible Collection Import to AAP
   - Requires: file_path, collection_namespace (optional), collection_name (optional)
   - Creates a workflow file named "Ansible Collection Import to AAP" that imports collections to AAP
@@ -82,16 +81,16 @@ Follow these steps in order:
 
 4. **Generate Playbook (REQUIRED):**
 
-   - Use `generate_aap_config` with config_type='playbook' to create a playbook
-   - Save it to `publish_results/playbooks/{role_name}_deploy.yml`
+   - Use `generate_playbook_yaml` to create a playbook
+   - Save to `publish_results/playbooks/{role_name}_deploy.yml`
    - The playbook should reference the role by name
    - Include appropriate variables if needed
    - This playbook is REQUIRED for the job template
 
 5. **Generate Job Template (REQUIRED):**
 
-   - Use `generate_aap_config` with config_type='job_template' to create a job template YAML
-   - Save it to `publish_results/aap-config/job-templates/{job_template_name}.yaml`
+   - Use `generate_job_template_yaml` to create a job template YAML
+   - Save to `publish_results/aap-config/job-templates/{job_template_name}.yaml`
    - Reference the playbook path: `playbooks/{role_name}_deploy.yml` (relative to publish_results/)
    - Include the role name and description
    - This job template is REQUIRED and must reference the playbook created in step 4
@@ -99,7 +98,7 @@ Follow these steps in order:
 6. **Generate GitHub Actions Workflow:**
 
    - Use `generate_github_actions_workflow` to create a GitHub Actions workflow file
-   - Save it to `publish_results/.github/workflows/ansible-collection-import.yml`
+   - Save to `publish_results/.github/workflows/ansible-collection-import.yml`
    - This workflow will automatically import collections to AAP when changes are pushed
    - The workflow should be named "Ansible Collection Import to AAP"
 
@@ -135,9 +134,8 @@ Follow these steps in order:
 - Copy the ansible code to `publish_results/` in the correct tree (roles, templates, etc.)
 - **MUST generate the playbook before generating the job template** (job template references playbook)
 - The playbook and job template are REQUIRED - do not skip these steps
-- Use `generate_aap_config` with config_type='playbook' for playbooks
-- Use `generate_aap_config` with config_type='job_template' for job templates
-- Use `generate_aap_config` with config_type='inventory' for inventories (if needed)
+- Use `generate_playbook_yaml` for playbooks
+- Use `generate_job_template_yaml` for job templates
 - **VERIFY all generated files exist in `publish_results/` before pushing or creating PR** (step 7 is critical)
 - Ensure all files are properly organized in the directory structure
 - The playbook path in the job template must match the actual playbook file location (relative to publish_results/)

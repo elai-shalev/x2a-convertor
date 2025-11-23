@@ -17,12 +17,11 @@ from src.model import get_model, get_runnable_config, report_tool_calls
 from src.utils.logging import get_logger
 from tools.copy_role_directory import CopyRoleDirectoryTool
 from tools.create_directory_structure import CreateDirectoryStructureTool
-from tools.generate_aap_config import GenerateAAPConfigTool
 from tools.generate_github_actions_workflow import (
     GenerateGitHubActionsWorkflowTool,
 )
-from tools.github_create_pr import GitHubCreatePRTool
-from tools.github_push_role import GitHubPushRoleTool
+from tools.generate_job_template_yaml import GenerateJobTemplateYAMLTool
+from tools.generate_playbook_yaml import GeneratePlaybookYAMLTool
 
 logger = get_logger(__name__)
 
@@ -60,24 +59,24 @@ class PublishAgent:
     4. Generates a playbook that uses the role
     5. Generates a job template that references the playbook
     6. Generates GitHub Actions workflow for GitOps
-    7. Verifies all generated files exist
-    8. Pushes to GitHub (last, after verification)
-    9. Creates the PR via the tool
+    7. Verifies all generated files exist in the publish_results/ directory
+    8. Creates a Pull Request for the publish_results/ directory to the
+       GitHub repository
     """
 
     # Tools available to the agent
-    # Consolidated GenerateAAPConfigTool replaces GeneratePlaybookYAMLTool,
-    # GenerateJobTemplateYAMLTool, and GenerateInventoryYAMLTool
+    # Matching successful run: 9 tools with ~2034 chars total
+    # Using separate tools like the successful run (not consolidated)
     BASE_TOOLS: ClassVar[list[Callable[[], BaseTool]]] = [
         lambda: FileSearchTool(),
         lambda: ListDirectoryTool(),
         lambda: ReadFileTool(),
         lambda: CreateDirectoryStructureTool(),
         lambda: CopyRoleDirectoryTool(),
-        lambda: GenerateAAPConfigTool(),
+        lambda: GeneratePlaybookYAMLTool(),
+        lambda: GenerateJobTemplateYAMLTool(),
         lambda: GenerateGitHubActionsWorkflowTool(),
-        lambda: GitHubPushRoleTool(),
-        lambda: GitHubCreatePRTool(),
+        # lambda: GitHubCreatePRTool(),  # Commented out like successful run
     ]
 
     SYSTEM_PROMPT_NAME = "publish_role_system"
@@ -104,6 +103,14 @@ class PublishAgent:
         # Build tools from base tools
         tools = [factory() for factory in self.BASE_TOOLS]
 
+        # Log tool info for debugging context size
+        tool_desc_size = sum(
+            len(str(tool.description) if hasattr(tool, "description") else "")
+            for tool in tools
+        )
+        logger.debug(f"Number of tools: {len(tools)}")
+        logger.debug(f"Total tool description size: ~{tool_desc_size} chars")
+
         return create_react_agent(
             model=self.model, tools=tools
         )  # pyrefly: ignore
@@ -120,8 +127,8 @@ class PublishAgent:
         5. Generate a job template that references the playbook
         6. Generate GitHub Actions workflow for GitOps
         7. Verify all generated files exist
-        8. Push to GitHub (last, after verification)
-        9. Create the PR via the tool
+        SKIP FOR NOW: 8. Push to GitHub (last, after verification)
+        SKIP FOR NOW: #9. Create the PR via the tool
 
         Args:
             initial_state: PublishState with role information
@@ -132,16 +139,30 @@ class PublishAgent:
         slog = logger.bind(phase="publish_role")
         slog.info("Publishing role using GitOps approach")
 
-        agent = self._create_react_agent(initial_state)
-
         role_name = initial_state["role"]
         role_path = initial_state["role_path"]
         github_repo = initial_state["github_repository_url"]
         github_branch = initial_state["github_branch"]
         job_template_name = initial_state["job_template_name"]
 
-        # Build the task prompt
+        # Build the task prompt - restored to match successful run
         system_prompt = get_prompt(self.SYSTEM_PROMPT_NAME)
+
+        # Build tools to calculate size before creating agent
+        tools = [factory() for factory in self.BASE_TOOLS]
+        tool_desc_size = sum(
+            len(str(tool.description) if hasattr(tool, "description") else "")
+            for tool in tools
+        )
+        tool_names = [
+            tool.name if hasattr(tool, "name") else "unknown" for tool in tools
+        ]
+        slog.debug(
+            f"Tools before agent creation: {len(tools)} tools - {tool_names}"
+        )
+
+        agent = self._create_react_agent(initial_state)
+        # User prompt - reduced to match successful run (~977 chars)
         user_prompt = (
             f"Publish the Ansible role '{role_name}' to GitHub "
             f"using GitOps approach.\n\n"
@@ -152,8 +173,7 @@ class PublishAgent:
             f"- GitHub branch: {github_branch}\n"
             f"- Job template name: {job_template_name}\n\n"
             f"IMPORTANT: All files must be created in the 'publish_results/' "
-            f"directory at the root level. This directory will contain the "
-            f"entire PR structure.\n\n"
+            f"directory at the root level.\n\n"
             f"Follow the workflow in the system prompt to:\n"
             f"1. Find the ansible code needed to upload\n"
             f"2. Generate directory structure for PR in publish_results/\n"
@@ -169,10 +189,9 @@ class PublishAgent:
             f"ansible-collection-import.yml)\n"
             f"7. Verify all generated files exist in publish_results/ "
             f"before proceeding\n"
-            f"8. Push to GitHub (only after verification)\n"
-            f"9. Create the PR via the tool\n\n"
-            f"Use the tools available to complete each step. "
-            f"Report any errors clearly."
+            f"SKIP FOR NOW: 8. Push to GitHub\n"
+            f"SKIP FOR NOW: 9. Create the PR\n\n"
+            f"Use the tools available to complete each step."
         )
 
         messages = [
@@ -182,13 +201,20 @@ class PublishAgent:
 
         try:
             slog.info(f"PublishAgent starting for role: {role_name}")
+            # Calculate total message size (approximate)
+            total_size = len(system_prompt) + len(user_prompt) + tool_desc_size
             slog.debug(
                 f"System prompt: {len(system_prompt)} chars, "
                 f"User prompt: {len(user_prompt)} chars, "
-                f"Total message size: ~{total_message_size} chars"
+                f"Total message size: ~{total_size} chars"
             )
+            slog.debug("Invoking react agent...")
+            slog.debug(f"Messages being sent: {len(messages)} messages")
+            slog.debug(f"First message type: {type(messages[0])}")
+            config = get_runnable_config()
+            slog.debug(f"Config: {config}")
             result = agent.invoke(
-                {"messages": messages}, config=get_runnable_config()
+                {"messages": messages}, config=config
             )
 
             slog.info(
@@ -220,6 +246,16 @@ class PublishAgent:
                 f"Error type: {type(e).__name__}, "
                 f"Role: {role_name}, Path: {role_path}"
             )
+            # Log full exception details for debugging
+            import traceback
+            slog.debug(f"Full traceback: {traceback.format_exc()}")
+            exception_args = e.args if hasattr(e, "args") else "N/A"
+            slog.debug(f"Exception args: {exception_args}")
+            if hasattr(e, "__cause__") and e.__cause__:
+                slog.debug(f"Exception cause: {e.__cause__}")
+            if hasattr(e, "__context__") and e.__context__:
+                slog.debug(f"Exception context: {e.__context__}")
+
             initial_state["failed"] = True
             # Extract main error message if it's a complex error
             if " - " in error_str:
