@@ -1,0 +1,117 @@
+{
+  "module_name": "nginx_multisite",
+  "items": [
+    {
+      "category": "structure",
+      "source_path": "N/A",
+      "target_path": "ansible/nginx_multisite/meta/main.yml",
+      "status": "complete",
+      "description": "Role metadata",
+      "notes": "Created standard meta/main.yml"
+    },
+    {
+      "category": "templates",
+      "source_path": "cookbooks/nginx-multisite/templates/default/fail2ban.jail.local.erb",
+      "target_path": "ansible/nginx_multisite/templates/fail2ban.jail.local.j2",
+      "status": "complete",
+      "description": "Fail2ban template",
+      "notes": "Converted fail2ban.jail.local.erb to fail2ban.jail.local.j2"
+    },
+    {
+      "category": "templates",
+      "source_path": "cookbooks/nginx-multisite/templates/default/nginx.conf.erb",
+      "target_path": "ansible/nginx_multisite/templates/nginx.conf.j2",
+      "status": "complete",
+      "description": "Nginx configuration template",
+      "notes": "Converted nginx.conf.erb to nginx.conf.j2"
+    },
+    {
+      "category": "templates",
+      "source_path": "cookbooks/nginx-multisite/templates/default/security.conf.erb",
+      "target_path": "ansible/nginx_multisite/templates/security.conf.j2",
+      "status": "complete",
+      "description": "Security configuration template",
+      "notes": "Converted security.conf.erb to security.conf.j2"
+    },
+    {
+      "category": "templates",
+      "source_path": "cookbooks/nginx-multisite/templates/default/site.conf.erb",
+      "target_path": "ansible/nginx_multisite/templates/site.conf.j2",
+      "status": "complete",
+      "description": "Site configuration template",
+      "notes": "Converted site.conf.erb to site.conf.j2"
+    },
+    {
+      "category": "templates",
+      "source_path": "cookbooks/nginx-multisite/templates/default/sysctl-security.conf.erb",
+      "target_path": "ansible/nginx_multisite/templates/sysctl-security.conf.j2",
+      "status": "complete",
+      "description": "Sysctl security configuration template",
+      "notes": "Converted sysctl-security.conf.erb to sysctl-security.conf.j2"
+    },
+    {
+      "category": "recipes",
+      "source_path": "cookbooks/nginx-multisite/recipes/security.rb",
+      "target_path": "ansible/nginx_multisite/tasks/security.yml",
+      "status": "complete",
+      "description": "Security recipe tasks",
+      "notes": "Converted security.rb to security.yml"
+    },
+    {
+      "category": "recipes",
+      "source_path": "cookbooks/nginx-multisite/recipes/nginx.rb",
+      "target_path": "ansible/nginx_multisite/tasks/nginx.yml",
+      "status": "complete",
+      "description": "Nginx recipe tasks",
+      "notes": "Converted nginx.rb to nginx.yml"
+    },
+    {
+      "category": "recipes",
+      "source_path": "cookbooks/nginx-multisite/recipes/ssl.rb",
+      "target_path": "ansible/nginx_multisite/tasks/ssl.yml",
+      "status": "complete",
+      "description": "SSL recipe tasks",
+      "notes": "Converted ssl.rb to ssl.yml"
+    },
+    {
+      "category": "recipes",
+      "source_path": "cookbooks/nginx-multisite/recipes/sites.rb",
+      "target_path": "ansible/nginx_multisite/tasks/sites.yml",
+      "status": "complete",
+      "description": "Sites recipe tasks",
+      "notes": "Converted sites.rb to sites.yml"
+    },
+    {
+      "category": "attributes",
+      "source_path": "cookbooks/nginx-multisite/attributes/default.rb",
+      "target_path": "ansible/nginx_multisite/defaults/main.yml",
+      "status": "complete",
+      "description": "Default attributes",
+      "notes": "Converted default.rb to main.yml"
+    },
+    {
+      "category": "files",
+      "source_path": "cookbooks/nginx-multisite/files/default/ci/index.html",
+      "target_path": "ansible/nginx_multisite/files/ci/index.html",
+      "status": "complete",
+      "description": "CI index.html file",
+      "notes": "Copied index.html for ci.cluster.local"
+    },
+    {
+      "category": "files",
+      "source_path": "cookbooks/nginx-multisite/files/default/status/index.html",
+      "target_path": "ansible/nginx_multisite/files/status/index.html",
+      "status": "complete",
+      "description": "Status index.html file",
+      "notes": "Copied index.html for status.cluster.local"
+    },
+    {
+      "category": "files",
+      "source_path": "cookbooks/nginx-multisite/files/default/test/index.html",
+      "target_path": "ansible/nginx_multisite/files/test/index.html",
+      "status": "complete",
+      "description": "Test index.html file",
+      "notes": "Copied index.html for test.cluster.local"
+    }
+  ]
+}

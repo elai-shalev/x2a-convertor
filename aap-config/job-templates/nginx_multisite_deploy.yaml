@@ -1,0 +1,11 @@
+apiVersion: tower.ansible.com/v1beta1
+kind: JobTemplate
+metadata:
+  name: Nginx Multisite Deploy
+spec:
+  name: Nginx Multisite Deploy
+  job_type: run
+  playbook: playbooks/nginx_multisite_deploy.yml
+  inventory: webservers-production
+  description: Job template for deploying Nginx Multisite
+  role_name: nginx_multisite
