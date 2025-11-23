@@ -64,43 +64,42 @@ Follow these steps in order:
 2. **Generate Directory Structure for PR:**
 
    - Use `create_directory_structure` to set up the GitOps repository structure
-   - **IMPORTANT: All directories must be created under `publish_results/`**
-   - Set base_path to `publish_results/` and create:
-     - `roles/{role_name}/` - Where the role will be copied
-     - `playbooks/` - For playbook files (REQUIRED)
-     - `aap-config/job-templates/` - For job template YAMLs (REQUIRED)
-     - `.github/workflows/` - For GitHub Actions workflow files
-     - `aap-config/inventories/` - For inventory YAMLs (optional)
-     - Any other directories needed for the specific tree structure
+   - **CRITICAL: Set base_path to `publish_results/` (NOT current directory)**
+   - Create structure: `['roles/{role_name}', 'playbooks', 'aap-config/job-templates', '.github/workflows']`
+   - All directories will be created under `publish_results/`
 
 3. **Add Ansible Code to Directory:**
 
-   - Use `copy_role_directory` to copy the role to `publish_results/roles/{role_name}/`
+   - Use `copy_role_directory` to copy the role
+   - Source: the role path provided
+   - Destination: `publish_results/roles/{role_name}/` (MUST include publish_results/ prefix)
    - This preserves the complete role structure (tasks/, handlers/, templates/, etc.)
-   - Ensure all ansible code is properly organized in the directory tree
 
-4. **Generate Playbook (REQUIRED):**
+4. **Generate Playbook (REQUIRED - MUST COMPLETE):**
 
-   - Use `generate_playbook_yaml` to create a playbook
-   - Save to `publish_results/playbooks/{role_name}_deploy.yml`
+   - **CRITICAL: You MUST use `generate_playbook_yaml` tool to create the playbook**
+   - **file_path MUST be: `publish_results/playbooks/{role_name}_deploy.yml` (include publish_results/ prefix)**
+   - Required parameters: file_path (with publish_results/), name, role_name
+   - Optional: hosts (default: 'all'), become (default: false), vars (default: {})
    - The playbook should reference the role by name
-   - Include appropriate variables if needed
-   - This playbook is REQUIRED for the job template
+   - **DO NOT skip this step - the playbook file MUST be created in publish_results/**
 
-5. **Generate Job Template (REQUIRED):**
+5. **Generate Job Template (REQUIRED - MUST COMPLETE):**
 
-   - Use `generate_job_template_yaml` to create a job template YAML
-   - Save to `publish_results/aap-config/job-templates/{job_template_name}.yaml`
-   - Reference the playbook path: `playbooks/{role_name}_deploy.yml` (relative to publish_results/)
-   - Include the role name and description
-   - This job template is REQUIRED and must reference the playbook created in step 4
+   - **CRITICAL: You MUST use `generate_job_template_yaml` tool to create the job template**
+   - **file_path MUST be: `publish_results/aap-config/job-templates/{job_template_name}.yaml` (include publish_results/ prefix)**
+   - Required parameters: file_path (with publish_results/), name, playbook_path, inventory
+   - playbook_path should be: `playbooks/{role_name}_deploy.yml` (relative path, no publish_results/ prefix)
+   - Optional: role_name, description, extra_vars
+   - **DO NOT skip this step - the job template file MUST be created in publish_results/**
 
-6. **Generate GitHub Actions Workflow:**
+6. **Generate GitHub Actions Workflow (REQUIRED - MUST COMPLETE):**
 
-   - Use `generate_github_actions_workflow` to create a GitHub Actions workflow file
-   - Save to `publish_results/.github/workflows/ansible-collection-import.yml`
-   - This workflow will automatically import collections to AAP when changes are pushed
-   - The workflow should be named "Ansible Collection Import to AAP"
+   - **CRITICAL: You MUST use `generate_github_actions_workflow` tool to create the workflow**
+   - **file_path MUST be: `publish_results/.github/workflows/ansible-collection-import.yml` (include publish_results/ prefix)**
+   - Required parameter: file_path (with publish_results/)
+   - Optional: collection_namespace, collection_name
+   - **DO NOT skip this step - the workflow file MUST be created in publish_results/**
 
 7. **Verify Generated Files (IMPORTANT - Do this before pushing):**
 

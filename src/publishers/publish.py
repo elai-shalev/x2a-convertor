@@ -22,6 +22,7 @@ from tools.generate_github_actions_workflow import (
 )
 from tools.generate_job_template_yaml import GenerateJobTemplateYAMLTool
 from tools.generate_playbook_yaml import GeneratePlaybookYAMLTool
+from tools.github_create_pr import GitHubCreatePRTool
 
 logger = get_logger(__name__)
 
@@ -76,7 +77,7 @@ class PublishAgent:
         lambda: GeneratePlaybookYAMLTool(),
         lambda: GenerateJobTemplateYAMLTool(),
         lambda: GenerateGitHubActionsWorkflowTool(),
-        # lambda: GitHubCreatePRTool(),  # Commented out like successful run
+        lambda: GitHubCreatePRTool(),
     ]
 
     SYSTEM_PROMPT_NAME = "publish_role_system"
@@ -127,8 +128,7 @@ class PublishAgent:
         5. Generate a job template that references the playbook
         6. Generate GitHub Actions workflow for GitOps
         7. Verify all generated files exist
-        SKIP FOR NOW: 8. Push to GitHub (last, after verification)
-        SKIP FOR NOW: #9. Create the PR via the tool
+        9. Create the PR to push to Github via the tool
 
         Args:
             initial_state: PublishState with role information
@@ -162,7 +162,8 @@ class PublishAgent:
         )
 
         agent = self._create_react_agent(initial_state)
-        # User prompt - reduced to match successful run (~977 chars)
+        # User prompt - matching successful run (~977 chars)
+        # Make paths explicit and emphasize they MUST be created
         user_prompt = (
             f"Publish the Ansible role '{role_name}' to GitHub "
             f"using GitOps approach.\n\n"
@@ -173,7 +174,8 @@ class PublishAgent:
             f"- GitHub branch: {github_branch}\n"
             f"- Job template name: {job_template_name}\n\n"
             f"IMPORTANT: All files must be created in the 'publish_results/' "
-            f"directory at the root level.\n\n"
+            f"directory at the root level. This directory will contain the "
+            f"entire PR structure.\n\n"
             f"Follow the workflow in the system prompt to:\n"
             f"1. Find the ansible code needed to upload\n"
             f"2. Generate directory structure for PR in publish_results/\n"
@@ -189,9 +191,10 @@ class PublishAgent:
             f"ansible-collection-import.yml)\n"
             f"7. Verify all generated files exist in publish_results/ "
             f"before proceeding\n"
-            f"SKIP FOR NOW: 8. Push to GitHub\n"
-            f"SKIP FOR NOW: 9. Create the PR\n\n"
-            f"Use the tools available to complete each step."
+            f"SKIP FOR NOW: 8. Push to GitHub (only after verification)\n"
+            f"SKIP FOR NOW: 9. Create the PR via the tool\n\n"
+            f"Use the tools available to complete each step. "
+            f"Report any errors clearly."
         )
 
         messages = [
