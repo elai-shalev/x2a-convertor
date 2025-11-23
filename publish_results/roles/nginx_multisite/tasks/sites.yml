@@ -1,0 +1,21 @@
+---
+- name: Configure Nginx sites
+  block:
+    - name: Template site configuration
+      ansible.builtin.template:
+        src: templates/site.conf.j2
+        dest: /etc/nginx/sites-available/{{ item.key }}
+        mode: "0644"
+      notify: reload nginx
+    - name: Enable site configuration
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/{{ item.key }}
+        dest: /etc/nginx/sites-enabled/{{ item.key }}
+        state: link
+      notify: reload nginx
+  loop: "{{ nginx_sites }}"
+- name: Remove default site configuration
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: reload nginx
