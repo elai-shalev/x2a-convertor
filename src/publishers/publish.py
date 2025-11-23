@@ -162,7 +162,6 @@ class PublishAgent:
         )
 
         agent = self._create_react_agent(initial_state)
-        # User prompt - matching successful run (~977 chars)
         # Make paths explicit and emphasize they MUST be created
         user_prompt = (
             f"Publish the Ansible role '{role_name}' to GitHub "
@@ -191,8 +190,9 @@ class PublishAgent:
             f"ansible-collection-import.yml)\n"
             f"7. Verify all generated files exist in publish_results/ "
             f"before proceeding\n"
-            f"SKIP FOR NOW: 8. Push to GitHub (only after verification)\n"
-            f"SKIP FOR NOW: 9. Create the PR via the tool\n\n"
+            f"8. Create a Pull Request using github_create_pr tool\n"
+            f"   - Use a feature branch name (e.g., 'publish-{role_name}')\n"
+            f"   - Include title and description about GitOps sync to AAP\n\n"
             f"Use the tools available to complete each step. "
             f"Report any errors clearly."
         )

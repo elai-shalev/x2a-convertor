@@ -45,10 +45,10 @@ You have access to these tools:
 
 **GitHub Tools:**
 
-- `github_push_role`: Push changes to a GitHub repository
-  - Requires: role_path, repository_url, branch, commit_message
 - `github_create_pr`: Create a Pull Request in GitHub
-  - Requires: repository_url, title, body, head (branch), base (branch, default: main)
+  - Requires: repository_url, title, body, head (branch name)
+  - Optional: base (branch, default: 'main')
+  - Creates a PR from the head branch to the base branch
 
 ## Workflow
 
@@ -110,20 +110,18 @@ Follow these steps in order:
    - Verify the GitHub Actions workflow exists at `publish_results/.github/workflows/ansible-collection-import.yml`
    - Only proceed to push/PR creation after verifying all files exist and are correct
 
-8. **Push to GitHub (Only after verification):**
+8. **Create Pull Request (After verification):**
 
-   - Use `github_push_role` to push all changes from `publish_results/` to the repository
+   - **CRITICAL: You MUST use `github_create_pr` tool to create the PR**
    - This should ONLY be done after verifying all files are correctly generated in step 7
-   - Push to a feature branch (not main/master)
-   - The push should happen LAST, after all files are verified
-   - The role_path should point to `publish_results/` directory
-
-9. **Create Pull Request:**
-
-   - Use `github_create_pr` to create a PR with all the changes
-   - Include a clear title and description
-   - Mention that this is for GitOps sync to AAP
-   - This should be done after the push in step 8
+   - Required parameters:
+     - repository_url: The GitHub repository URL provided
+     - title: PR title (e.g., "Publish {role_name} role for GitOps")
+     - body: PR description mentioning GitOps sync to AAP
+     - head: Feature branch name (e.g., 'publish-{role_name}' or 'publish-{role_name}-{timestamp}')
+   - Optional: base (default: 'main') - target branch
+   - **Note: The branch must exist in the repository. If it doesn't exist, the tool will report an error.**
+   - **DO NOT skip this step - attempt to create the PR even if branch might not exist yet**
 
 ## Important Rules
 
