@@ -123,6 +123,10 @@ def get_model() -> BaseChatModel:
         if not kwargs["base_url"]:
             logger.warning("OPENAI_API_BASE is not set")
         logger.debug(f"OPENAI_API_BASE: {kwargs['base_url']}")
+        logger.debug(
+            f"OPENAI_API_KEY present: {bool(kwargs['api_key'])}, "
+            f"length: {len(kwargs['api_key']) if kwargs['api_key'] else 0}"
+        )
 
     kwargs["model_provider"] = provider
     logger.info(

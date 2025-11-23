@@ -1,15 +1,27 @@
-import os
-from pathlib import Path
-from typing import TypedDict
+from collections.abc import Callable
+from typing import ClassVar, TypedDict
 
-from langgraph.graph import END, StateGraph
-from langgraph.graph.state import CompiledStateGraph
+from langchain_community.tools.file_management.file_search import (
+    FileSearchTool,
+)
+from langchain_community.tools.file_management.list_dir import (
+    ListDirectoryTool,
+)
+from langchain_community.tools.file_management.read import ReadFileTool
+from langchain_core.tools import BaseTool
+from langgraph.prebuilt import create_react_agent
 from pydantic import BaseModel
 
-from src.model import get_model, get_runnable_config
+from prompts.get_prompt import get_prompt
+from src.model import get_model, get_runnable_config, report_tool_calls
 from src.utils.logging import get_logger
-from tools.aap_create_job_template import AAPCreateJobTemplateTool
-from tools.aap_register_role import AAPRegisterRoleTool
+from tools.copy_role_directory import CopyRoleDirectoryTool
+from tools.create_directory_structure import CreateDirectoryStructureTool
+from tools.generate_aap_config import GenerateAAPConfigTool
+from tools.generate_github_actions_workflow import (
+    GenerateGitHubActionsWorkflowTool,
+)
+from tools.github_create_pr import GitHubCreatePRTool
 from tools.github_push_role import GitHubPushRoleTool
 
 logger = get_logger(__name__)
@@ -37,202 +49,193 @@ class PublishState(TypedDict):
 
 
 class PublishAgent:
+    """Agent for publishing Ansible roles to GitHub using GitOps approach.
+
+    Uses a react agent pattern where the LLM decides which tools to use
+    based on the task description. The agent:
+    1. Finds the ansible code needed to upload
+    2. Generates directory structure for PR
+    3. Adds the ansible code to that directory in the specific tree
+       (roles, templates etc)
+    4. Generates a playbook that uses the role
+    5. Generates a job template that references the playbook
+    6. Generates GitHub Actions workflow for GitOps
+    7. Verifies all generated files exist
+    8. Pushes to GitHub (last, after verification)
+    9. Creates the PR via the tool
+    """
+
+    # Tools available to the agent
+    # Consolidated GenerateAAPConfigTool replaces GeneratePlaybookYAMLTool,
+    # GenerateJobTemplateYAMLTool, and GenerateInventoryYAMLTool
+    BASE_TOOLS: ClassVar[list[Callable[[], BaseTool]]] = [
+        lambda: FileSearchTool(),
+        lambda: ListDirectoryTool(),
+        lambda: ReadFileTool(),
+        lambda: CreateDirectoryStructureTool(),
+        lambda: CopyRoleDirectoryTool(),
+        lambda: GenerateAAPConfigTool(),
+        lambda: GenerateGitHubActionsWorkflowTool(),
+        lambda: GitHubPushRoleTool(),
+        lambda: GitHubCreatePRTool(),
+    ]
+
+    SYSTEM_PROMPT_NAME = "publish_role_system"
+
     def __init__(self, model=None) -> None:
+        """Initialize publish agent with model.
+
+        Args:
+            model: LLM model to use (defaults to get_model())
+        """
         self.model = model or get_model()
-        self._graph = self._build_graph()
-        workflow_mermaid = self._graph.get_graph().draw_mermaid()
-        logger.debug("Publish workflow: " + workflow_mermaid)
 
-        # Initialize tools
-        self.github_push_tool = GitHubPushRoleTool()
-        self.register_role_tool = AAPRegisterRoleTool()
-        self.create_job_template_tool = AAPCreateJobTemplateTool()
+    def _create_react_agent(self, state: PublishState):
+        """Create a react agent with publishing tools.
 
-    def _build_graph(self) -> CompiledStateGraph:
-        workflow = StateGraph(PublishState)
+        Args:
+            state: PublishState with role information
 
-        workflow.add_node(
-            "push_to_github", lambda state: self._push_to_github(state)
-        )
-        workflow.add_node(
-            "register_role", lambda state: self._register_role(state)
-        )
-        workflow.add_node(
-            "create_job_template",
-            lambda state: self._create_job_template(state),
-        )
+        Returns:
+            Configured react agent
+        """
+        logger.info("Creating PublishAgent react agent")
 
-        workflow.set_entry_point("push_to_github")
-        workflow.add_edge("push_to_github", "register_role")
-        workflow.add_edge("register_role", "create_job_template")
-        workflow.add_edge("create_job_template", END)
+        # Build tools from base tools
+        tools = [factory() for factory in self.BASE_TOOLS]
 
-        return workflow.compile()
-
-    def _push_to_github(self, state: PublishState) -> PublishState:
-        """Push the role to GitHub repository."""
-        if state.get("failed"):
-            return state
-
-        logger.info("PublishAgent is pushing role to GitHub")
-
-        role = state["role"]
-        role_path = state["role_path"]
-        repository_url = state["github_repository_url"]
-        branch = state["github_branch"]
-
-        # Verify role path exists
-        role_path_obj = Path(role_path)
-        if not role_path_obj.exists():
-            state["failed"] = True
-            state["failure_reason"] = f"Role path does not exist: {role_path}"
-            return state
-
-        try:
-            commit_message = (
-                f"Add migrated Ansible role: {role}\n\n"
-                "Migrated from Chef/Puppet/Salt using x2a-convertor"
-            )
-
-            result = self.github_push_tool.invoke(
-                {
-                    "role_path": role_path,
-                    "repository_url": repository_url,
-                    "branch": branch,
-                    "commit_message": commit_message,
-                }
-            )
-
-            # TODO: Parse the actual result when API is implemented
-            if "ERROR" in result:
-                state["failed"] = True
-                state["failure_reason"] = f"Failed to push to GitHub: {result}"
-            else:
-                logger.info(
-                    f"Role {role} pushed to GitHub successfully: "
-                    f"{repository_url}"
-                )
-
-        except Exception as e:
-            logger.error(f"Error pushing to GitHub: {e}")
-            state["failed"] = True
-            state["failure_reason"] = f"Failed to push to GitHub: {e}"
-
-        return state
-
-    def _register_role(self, state: PublishState) -> PublishState:
-        """Register the role in AAP from GitHub repository."""
-        if state.get("failed"):
-            return state
-
-        logger.info("PublishAgent is registering role in AAP")
-
-        role_name = state["role"]
-        repository_url = state["github_repository_url"]
-        branch = state["github_branch"]
-        role_path = state["role_path"]
-
-        try:
-            # Extract role path within repository
-            # If role is at ansible/{role_name}, the path in repo
-            # would be {role_name}
-            role_path_in_repo = Path(role_path).name
-
-            result = self.register_role_tool.invoke(
-                {
-                    "role_name": role_name,
-                    "github_repository_url": repository_url,
-                    "github_branch": branch,
-                    "role_path": role_path_in_repo,
-                }
-            )
-
-            # TODO: Parse the actual result when API is implemented
-            if "ERROR" in result:
-                state["failed"] = True
-                state["failure_reason"] = (
-                    f"Failed to register role in AAP: {result}"
-                )
-            else:
-                logger.info(
-                    f"Role {role_name} registered in AAP successfully from "
-                    f"{repository_url}"
-                )
-                state["role_registered"] = True
-
-        except Exception as e:
-            logger.error(f"Error registering role in AAP: {e}")
-            state["failed"] = True
-            state["failure_reason"] = f"Failed to register role in AAP: {e}"
-
-        return state
-
-    def _create_job_template(self, state: PublishState) -> PublishState:
-        """Create a job template in AAP that uses the role."""
-        if state.get("failed"):
-            return state
-
-        logger.info("PublishAgent is creating job template")
-
-        role_name = state["role"]
-        job_template_name = state["job_template_name"]
-        github_repo = state["github_repository_url"]
-
-        # Determine playbook path - typically a playbook that uses the role
-        # The playbook should be in the GitHub repository
-        # Format: playbooks/{role_name}_deploy.yml
-        playbook_path = f"playbooks/{role_name}_deploy.yml"
-
-        # Get inventory from environment or use default
-        inventory = os.getenv("AAP_INVENTORY", "Default")
-
-        try:
-            result = self.create_job_template_tool.invoke(
-                {
-                    "name": job_template_name,
-                    "playbook_path": playbook_path,
-                    "inventory": inventory,
-                    "role_name": role_name,
-                    "description": (
-                        f"Job template for deploying {role_name} role. "
-                        f"Role available in GitHub: {github_repo}. "
-                        "Created by x2a-convertor."
-                    ),
-                }
-            )
-
-            # TODO: Parse the actual result when API is implemented
-            if "ERROR" in result:
-                state["failed"] = True
-                state["failure_reason"] = (
-                    f"Failed to create job template: {result}"
-                )
-            else:
-                logger.info(
-                    f"Job template '{job_template_name}' created successfully"
-                )
-                state["job_template_created"] = True
-                state["publish_output"] = (
-                    f"Role {role_name} published successfully:\n"
-                    f"- Pushed to GitHub: {state['github_repository_url']}\n"
-                    f"- Registered in AAP from GitHub\n"
-                    f"- Job template created: {job_template_name}"
-                )
-
-        except Exception as e:
-            logger.error(f"Error creating job template: {e}")
-            state["failed"] = True
-            state["failure_reason"] = f"Failed to create job template: {e}"
-
-        return state
+        return create_react_agent(
+            model=self.model, tools=tools
+        )  # pyrefly: ignore
 
     def invoke(self, initial_state: PublishState) -> PublishState:
-        """Invoke the publish agent"""
-        result = self._graph.invoke(
-            input=initial_state, config=get_runnable_config()
+        """Execute publish workflow using react agent.
+
+        The agent will use tools autonomously to:
+        1. Find the ansible code needed to upload
+        2. Generate directory structure for PR
+        3. Add the ansible code to that directory in the specific tree
+           (roles, templates etc)
+        4. Generate a playbook that uses the role
+        5. Generate a job template that references the playbook
+        6. Generate GitHub Actions workflow for GitOps
+        7. Verify all generated files exist
+        8. Push to GitHub (last, after verification)
+        9. Create the PR via the tool
+
+        Args:
+            initial_state: PublishState with role information
+
+        Returns:
+            Updated PublishState with results
+        """
+        slog = logger.bind(phase="publish_role")
+        slog.info("Publishing role using GitOps approach")
+
+        agent = self._create_react_agent(initial_state)
+
+        role_name = initial_state["role"]
+        role_path = initial_state["role_path"]
+        github_repo = initial_state["github_repository_url"]
+        github_branch = initial_state["github_branch"]
+        job_template_name = initial_state["job_template_name"]
+
+        # Build the task prompt
+        system_prompt = get_prompt(self.SYSTEM_PROMPT_NAME)
+        user_prompt = (
+            f"Publish the Ansible role '{role_name}' to GitHub "
+            f"using GitOps approach.\n\n"
+            f"Role Information:\n"
+            f"- Role name: {role_name}\n"
+            f"- Role path: {role_path}\n"
+            f"- GitHub repository: {github_repo}\n"
+            f"- GitHub branch: {github_branch}\n"
+            f"- Job template name: {job_template_name}\n\n"
+            f"IMPORTANT: All files must be created in the 'publish_results/' "
+            f"directory at the root level. This directory will contain the "
+            f"entire PR structure.\n\n"
+            f"Follow the workflow in the system prompt to:\n"
+            f"1. Find the ansible code needed to upload\n"
+            f"2. Generate directory structure for PR in publish_results/\n"
+            f"3. Add the ansible code to publish_results/ in the specific "
+            f"tree (roles, templates etc)\n"
+            f"4. Generate a playbook that uses the role "
+            f"(save to publish_results/playbooks/{role_name}_deploy.yml)\n"
+            f"5. Generate a job template that references the playbook "
+            f"(save to publish_results/aap-config/job-templates/"
+            f"{job_template_name}.yaml)\n"
+            f"6. Generate GitHub Actions workflow for GitOps "
+            f"(save to publish_results/.github/workflows/"
+            f"ansible-collection-import.yml)\n"
+            f"7. Verify all generated files exist in publish_results/ "
+            f"before proceeding\n"
+            f"8. Push to GitHub (only after verification)\n"
+            f"9. Create the PR via the tool\n\n"
+            f"Use the tools available to complete each step. "
+            f"Report any errors clearly."
         )
-        logger.debug(f"Publish agent result: {result}")
-        return PublishState(**result)
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
+        try:
+            slog.info(f"PublishAgent starting for role: {role_name}")
+            slog.debug(
+                f"System prompt: {len(system_prompt)} chars, "
+                f"User prompt: {len(user_prompt)} chars, "
+                f"Total message size: ~{total_message_size} chars"
+            )
+            result = agent.invoke(
+                {"messages": messages}, config=get_runnable_config()
+            )
+
+            slog.info(
+                f"Publish agent tools: {report_tool_calls(result).to_string()}"
+            )
+
+            # Extract the final message from the agent response
+            final_message = result.get("messages", [])[-1]
+            if hasattr(final_message, "content"):
+                content = final_message.content
+            else:
+                content = str(final_message)
+
+            # Update state with results
+            initial_state["publish_output"] = content
+            initial_state["failed"] = "ERROR" in content.upper()
+            if initial_state["failed"]:
+                initial_state["failure_reason"] = content
+            else:
+                # Mark steps as completed if no errors
+                initial_state["job_template_created"] = True
+
+            slog.info(f"PublishAgent completed for role: {role_name}")
+
+        except Exception as e:
+            error_str = str(e)
+            slog.error(f"Error in PublishAgent: {error_str}")
+            slog.error(
+                f"Error type: {type(e).__name__}, "
+                f"Role: {role_name}, Path: {role_path}"
+            )
+            initial_state["failed"] = True
+            # Extract main error message if it's a complex error
+            if " - " in error_str:
+                main_error = error_str.split(" - ")[0]
+            else:
+                main_error = error_str
+            initial_state["failure_reason"] = (
+                f"Publish agent error: {main_error}"
+            )
+            initial_state["publish_output"] = (
+                f"ERROR: LLM API error occurred. "
+                f"This may be a temporary issue with the model provider. "
+                f"Error details: {error_str}"
+            )
+
+        return PublishState(**initial_state)
 
 
 def publish_role(

@@ -1,7 +1,6 @@
 """Tool for pushing an Ansible role to a GitHub repository."""
 
 import os
-import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -16,9 +15,14 @@ logger = get_logger(__name__)
 class GitHubPushRoleInput(BaseModel):
     """Input schema for pushing a role to GitHub."""
 
-    role_path: str = Field(description="The local filesystem path to the role directory")
+    role_path: str = Field(
+        description="The local filesystem path to the role directory"
+    )
     repository_url: str = Field(
-        description="GitHub repository URL (e.g., 'https://github.com/user/repo.git')"
+        description=(
+            "GitHub repository URL "
+            "(e.g., 'https://github.com/user/repo.git')"
+        )
     )
     branch: str = Field(
         default="main",
@@ -47,7 +51,6 @@ class GitHubPushRoleTool(BaseTool):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.github_token = os.getenv("GITHUB_TOKEN", "")
 
     def _run(
         self,
@@ -68,8 +71,12 @@ class GitHubPushRoleTool(BaseTool):
             Success or error message
         """
         logger.info(
-            f"Pushing role from {role_path} to {repository_url} on branch {branch}"
+            f"Pushing role from {role_path} to {repository_url} "
+            f"on branch {branch}"
         )
+
+        # Get token from environment in _run method to avoid Pydantic issues
+        github_token = os.getenv("GITHUB_TOKEN", "")
 
         role_path_obj = Path(role_path)
         if not role_path_obj.exists():
@@ -78,7 +85,7 @@ class GitHubPushRoleTool(BaseTool):
         if not role_path_obj.is_dir():
             return f"ERROR: Role path is not a directory: {role_path}"
 
-        if not self.github_token:
+        if not github_token:
             return (
                 "ERROR: GITHUB_TOKEN environment variable not set. "
                 "Cannot authenticate with GitHub."
@@ -107,4 +114,3 @@ class GitHubPushRoleTool(BaseTool):
         except Exception as e:
             logger.error(f"Error pushing to GitHub: {e}")
             return f"ERROR: Failed to push to GitHub: {e}"
-

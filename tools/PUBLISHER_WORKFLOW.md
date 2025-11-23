@@ -1,64 +1,91 @@
 # Publisher Workflow Documentation
 
-This document describes the publisher workflow for pushing Ansible roles to GitHub and creating AAP job templates.
+This document describes the publisher workflow for publishing Ansible roles to GitHub using GitOps approach.
 
 ## Overview
 
 The publisher workflow (`src/publishers/publish.py`) automates the process of:
-1. Identifying the migrated Ansible role
-2. Pushing the role to a GitHub repository
-3. Creating a job template in Ansible Automation Platform (AAP) that uses the role
+
+1. Finding the ansible code needed to upload
+2. Generating directory structure for PR
+3. Adding the ansible code to that directory in the specific tree (roles, templates etc)
+4. Creating the PR via the tool
+
+The workflow uses a LangGraph react agent that autonomously decides which tools to use based on the task description.
 
 ## Workflow Steps
 
-### 1. Identify Role (`identify_role`)
+### 1. Find Ansible Code
 
-**Purpose:** Identifies the Ansible role/module that was created and determines configuration.
-
-**Actions:**
-- Determines the role path: `ansible/{role_name}/`
-- Gets GitHub repository URL from environment or uses default
-- Gets GitHub branch from environment (defaults to "main")
-- Generates job template name: `{role_name}_deploy`
-
-**Configuration:**
-- `GITHUB_REPOSITORY_URL`: GitHub repository URL (default: "https://github.com/your-org/ansible-roles.git")
-- `GITHUB_BRANCH`: Branch to push to (default: "main")
-
-### 2. Push to GitHub (`push_to_github`)
-
-**Purpose:** Commits and pushes the role to the GitHub repository.
+**Purpose:** Locate and validate the Ansible role/module that needs to be published.
 
 **Actions:**
-- Verifies role path exists
-- Commits role files with descriptive message
-- Pushes to specified branch
 
-**Tool Used:** `GitHubPushRoleTool`
+- Use file system tools (`list_directory`, `file_search`, `read_file`) to locate the ansible code
+- Verify the role path exists and contains valid Ansible role structure
+- Identify all files and directories that need to be included
+
+**Tools Used:**
+
+- `FileSearchTool`: Search for files in the role directory
+- `ListDirectoryTool`: List directory contents to verify role structure
+- `ReadFileTool`: Read files to validate role contents
+
+### 2. Generate Directory Structure for PR
+
+**Purpose:** Create the GitOps repository structure where the ansible code will be organized.
+
+**Actions:**
+
+- Create directories for roles, playbooks, and AAP configs
+- Set up the proper tree structure (roles/, templates/, etc.)
+
+**Tool Used:** `CreateDirectoryStructureTool`
+
+**Parameters:**
+
+- `base_path`: Base path where directories should be created
+- `structure`: List of directory paths to create
+
+### 3. Add Ansible Code to Directory
+
+**Purpose:** Copy the ansible code to the repository structure in the correct tree.
+
+**Actions:**
+
+- Copy the role directory to the new location
+- Preserve the complete role structure (tasks/, handlers/, templates/, etc.)
+- Ensure all ansible code is properly organized
+
+**Tool Used:** `CopyRoleDirectoryTool`
+
+**Parameters:**
+
+- `source_role_path`: Source path to the Ansible role directory
+- `destination_path`: Destination path where the role should be copied
+
+### 4. Create Pull Request
+
+**Purpose:** Create a PR with all the changes for review.
+
+**Actions:**
+
+- Create a PR from the feature branch to the base branch
+- Include a clear title and description
+
+**Tool Used:** `GitHubCreatePRTool`
+
+**Parameters:**
+
+- `repository_url`: GitHub repository URL
+- `title`: PR title
+- `body`: PR description/body
+- `head`: Branch name containing the changes (source branch)
+- `base`: Branch name to merge into (target branch, default: "main")
 
 **Environment Variables:**
-- `GITHUB_TOKEN`: GitHub personal access token for authentication
 
-**Implementation Status:** Placeholder - Git operations pending implementation
-
-### 3. Create Job Template (`create_job_template`)
-
-**Purpose:** Creates a job template in AAP that references the role in GitHub.
-
-**Actions:**
-- Determines playbook path: `playbooks/{role_name}_deploy.yml`
-- Gets inventory from environment (default: "Default")
-- Creates job template with appropriate description
-
-**Tool Used:** `AAPCreateJobTemplateTool`
-
-**Environment Variables:**
-- `AAP_API_URL`: Base URL for AAP API
-- `AAP_USERNAME`: Username for AAP authentication
-- `AAP_PASSWORD`: Password for AAP authentication
-- `AAP_INVENTORY`: Inventory name or ID (default: "Default")
-
-**Implementation Status:** Placeholder - AAP API calls pending implementation
+- `GITHUB_TOKEN`: GitHub personal access token for authentication (required)
 
 ## State Structure
 
@@ -82,55 +109,52 @@ The `PublishState` TypedDict contains:
 
 ## Tools
 
-### GitHubPushRoleTool
+### File System Tools
 
-**File:** `tools/github_push_role.py`
+- `FileSearchTool`: Search for files in the role directory
+- `ListDirectoryTool`: List directory contents to verify role structure
+- `ReadFileTool`: Read files to validate role contents
 
-**Purpose:** Push Ansible role to GitHub repository.
+### Directory Structure Tools
 
-**Parameters:**
-- `role_path`: Local filesystem path to role directory
-- `repository_url`: GitHub repository URL
-- `branch`: Branch to push to (default: "main")
-- `commit_message`: Commit message
+- `CreateDirectoryStructureTool`: Create directory structure for GitOps
+  - **File:** `tools/create_directory_structure.py`
+  - Creates all specified directories, creating parent directories as needed
 
-**TODO:**
-- Implement git initialization if needed
-- Add remote if not exists
-- Stage all files
-- Commit with message
-- Push to branch
-- Handle authentication with GITHUB_TOKEN
+### Role Management Tools
 
-### AAPCreateJobTemplateTool
+- `CopyRoleDirectoryTool`: Copy an entire Ansible role directory
+  - **File:** `tools/copy_role_directory.py`
+  - Recursively copies all files and subdirectories preserving the complete role structure
 
-**File:** `tools/aap_create_job_template.py`
+### Configuration Generation Tools (Optional)
 
-**Purpose:** Create a job template in AAP.
+- `GeneratePlaybookYAMLTool`: Generate a playbook YAML that uses the role
+  - **File:** `tools/generate_playbook_yaml.py`
+- `GenerateJobTemplateYAMLTool`: Generate AAP job template YAML configuration
+  - **File:** `tools/generate_job_template_yaml.py`
+- `GenerateInventoryYAMLTool`: Generate AAP inventory YAML configuration
+  - **File:** `tools/generate_inventory_yaml.py`
 
-**Parameters:**
-- `name`: Job template name
-- `playbook_path`: Path to playbook file
-- `inventory`: Inventory name or ID
-- `credential`: Credential name or ID (optional)
-- `description`: Description for job template
-- `extra_vars`: Extra variables in YAML format (optional)
+### GitHub Tools
 
-**TODO:**
-- Implement AAP API call to create job template
-- Handle authentication
-- Parse and validate API responses
-- Handle errors appropriately
+- `GitHubCreatePRTool`: Create a Pull Request in GitHub
+  - **File:** `tools/github_create_pr.py`
+  - Creates a PR from a branch to the base branch in a GitHub repository
+  - Requires `GITHUB_TOKEN` environment variable for authentication
 
 ## Usage
 
 ```python
 from src.publishers.publish import publish_role
-from src.types import AnsibleModule
 
 # Publish a role
-role = AnsibleModule("my_role")
-result = publish_role(role)
+result = publish_role(
+    role_name="my_role",
+    role_path="ansible/my_role",
+    github_repository_url="https://github.com/your-org/ansible-roles.git",
+    github_branch="main"
+)
 
 if result["failed"]:
     print(f"Failed: {result['failure_reason']}")
@@ -141,60 +165,49 @@ else:
 ## Environment Variables Summary
 
 ### GitHub
-- `GITHUB_REPOSITORY_URL`: Repository URL (optional, has default)
-- `GITHUB_BRANCH`: Branch name (optional, defaults to "main")
-- `GITHUB_TOKEN`: Authentication token (required for push)
 
-### AAP
-- `AAP_API_URL`: AAP API base URL (required)
-- `AAP_USERNAME`: AAP username (required)
-- `AAP_PASSWORD`: AAP password (required)
-- `AAP_INVENTORY`: Inventory name/ID (optional, defaults to "Default")
+- `GITHUB_REPOSITORY_URL`: Repository URL (passed as parameter)
+- `GITHUB_BRANCH`: Branch name (passed as parameter, defaults to "main")
+- `GITHUB_TOKEN`: Authentication token (required for creating PR)
 
 ## Implementation Notes
 
-### Playbook Path
+### Repository Structure
 
-The job template references a playbook at `playbooks/{role_name}_deploy.yml`. This playbook should:
-- Be present in the GitHub repository
-- Use the role that was pushed
-- Be structured appropriately for deployment
+The final repository structure should look like:
 
-Example playbook structure:
-```yaml
----
-- name: Deploy {role_name}
-  hosts: all
-  roles:
-    - {role_name}
+```
+repository/
+├── roles/
+│   └── {role_name}/          # Copied role directory
+│       ├── tasks/
+│       ├── handlers/
+│       ├── templates/
+│       ├── meta/
+│       └── ...
+├── playbooks/               # Optional: if playbooks are generated
+│   └── {role_name}_deploy.yml
+└── aap-config/              # Optional: if AAP configs are generated
+    ├── job-templates/
+    │   └── {role_name}_deploy.yaml
+    └── inventories/
+        └── webservers-production.yaml
 ```
 
 ### Error Handling
 
 The workflow includes comprehensive error handling:
+
 - Each step checks for previous failures
 - Errors are logged and stored in state
 - Workflow stops on first failure
 - Final state includes failure reason if failed
 
-## Next Steps
+### LangGraph React Agent
 
-1. **Implement GitHub Push:**
-   - Use GitPython or subprocess for git operations
-   - Handle authentication with GITHUB_TOKEN
-   - Implement proper error handling
+The publisher uses a LangGraph react agent pattern where:
 
-2. **Implement AAP Job Template Creation:**
-   - Research AAP API endpoints
-   - Implement HTTP client for API calls
-   - Handle authentication and response parsing
-
-3. **Generate Playbook:**
-   - Optionally generate the playbook file that uses the role
-   - Include it in the GitHub push
-
-4. **Testing:**
-   - Unit tests for each tool
-   - Integration tests for full workflow
-   - Error scenario testing
-
+- The LLM autonomously decides which tools to use
+- Tools are called based on the task description
+- The agent follows the workflow defined in the system prompt
+- All operations are performed via tools, ensuring traceability
