@@ -1,0 +1,7 @@
+---
+- name: Deploy nginx_multisite
+  hosts: all
+
+
+  roles:
+    - nginx_multisite
