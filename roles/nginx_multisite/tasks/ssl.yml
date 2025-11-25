@@ -1,0 +1,33 @@
+---
+- name: Install SSL dependencies
+  ansible.builtin.apt:
+    name:
+      - openssl
+      - ca-certificates
+    state: present
+- name: Create SSL group
+  ansible.builtin.group:
+    name: ssl-cert
+    state: present
+- name: Create certificate directory
+  ansible.builtin.file:
+    path: "{{ nginx_ssl_certificate_path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+- name: Create private key directory
+  ansible.builtin.file:
+    path: "{{ nginx_ssl_private_key_path }}"
+    state: directory
+    owner: root
+    group: ssl-cert
+    mode: "0710"
+- name: Generate SSL certificates
+  block:
+    - name: Generate certificate for each site
+      ansible.builtin.command:
+        cmd: "openssl req -x509 -nodes -days 365 -newkey rsa:2048 \\\n  -keyout {{ nginx_ssl_private_key_path }}/{{ item.key }}.key \\\n  -out {{ nginx_ssl_certificate_path
+          }}/{{ item.key }}.crt \\\n  -subj \"/C=US/ST=Example/L=Example/O=Example Org/OU=IT/CN={{ item.key }}/emailAddress=admin@example.com\""
+        creates: "{{ nginx_ssl_certificate_path }}/{{ item.key }}.crt"
+      loop: "{{ nginx_sites }}"
