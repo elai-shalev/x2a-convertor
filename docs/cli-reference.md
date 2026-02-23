@@ -267,6 +267,9 @@ uv run app.py report [OPTIONS]
 - `--artifacts` (default: Sentinel.UNSET)
   Artifact as type:url (e.g., migration_plan:https://storage.example/migration-plan.md)
 
+- `--commit-id`
+  Git commit SHA from the job's push to target repo
+
 ### Full Help
 
 ```
@@ -281,6 +284,7 @@ Options:
   --artifacts TEXT      Artifact as type:url (e.g.,
                         migration_plan:https://storage.example/migration-
                         plan.md)
+  --commit-id TEXT      Git commit SHA from the job's push to target repo
   --help                Show this message and exit.
 ```
 
