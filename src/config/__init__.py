@@ -22,7 +22,6 @@ Usage:
 from src.config.settings import (
     AAPSettings,
     AWSSettings,
-    GitHubSettings,
     LLMSettings,
     LoggingSettings,
     MoleculeSettings,
@@ -36,7 +35,6 @@ from src.config.settings import (
 __all__ = [
     "AAPSettings",
     "AWSSettings",
-    "GitHubSettings",
     "LLMSettings",
     "LoggingSettings",
     "MoleculeSettings",

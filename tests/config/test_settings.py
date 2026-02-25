@@ -5,7 +5,6 @@ from pydantic import SecretStr
 from src.config import (
     AAPSettings,
     AWSSettings,
-    GitHubSettings,
     LLMSettings,
     LoggingSettings,
     MoleculeSettings,
@@ -129,21 +128,6 @@ class TestAAPSettings:
         assert any("Auth required" in e for e in errors)
 
 
-class TestGitHubSettings:
-    """Tests for GitHub configuration."""
-
-    def test_default_values(self):
-        settings = GitHubSettings()
-        assert settings.token is None
-        assert settings.api_base == "https://api.github.com"
-
-    def test_api_base_normalized(self, monkeypatch):
-        monkeypatch.setenv("GITHUB_API_BASE", "https://api.github.example.com/")
-
-        settings = GitHubSettings()
-        assert settings.api_base == "https://api.github.example.com"
-
-
 class TestProcessingSettings:
     """Tests for processing configuration."""
 
@@ -203,7 +187,6 @@ class TestSettings:
         assert isinstance(settings.openai, OpenAISettings)
         assert isinstance(settings.aws, AWSSettings)
         assert isinstance(settings.aap, AAPSettings)
-        assert isinstance(settings.github, GitHubSettings)
         assert isinstance(settings.processing, ProcessingSettings)
         assert isinstance(settings.logging, LoggingSettings)
         assert isinstance(settings.molecule, MoleculeSettings)
