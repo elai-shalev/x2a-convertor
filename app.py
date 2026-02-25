@@ -12,7 +12,7 @@ from src.error_details import get_error_human_message
 from src.exporters.migrate import migrate_module
 from src.init import init_project
 from src.inputs.analyze import analyze_project
-from src.publishers.publish import publish_role
+from src.publishers.publish import publish_aap, publish_project
 from src.report import report_artifacts
 from src.utils.logging import get_logger, setup_logging
 from src.validate import validate_module
@@ -166,7 +166,7 @@ def validate(module_name) -> None:
     validate_module(module_name)
 
 
-@cli.command()
+@cli.command("publish-project")
 @click.argument("module_names", nargs=-1, required=True)
 @click.option(
     "--source-paths",
@@ -190,25 +190,6 @@ def validate(module_name) -> None:
     ),
 )
 @click.option(
-    "--github-owner",
-    help=(
-        "GitHub user or organization name where the repository "
-        "will be created (required if not using --skip-git)"
-    ),
-)
-@click.option(
-    "--github-branch",
-    default="main",
-    help="GitHub branch to push to (default: main, ignored if --skip-git)",
-)
-@click.option(
-    "--skip-git",
-    is_flag=True,
-    default=False,
-    help="Skip git steps (create repo, commit, push). "
-    "Files will be created in <base-path>/ansible/deployments/ only.",
-)
-@click.option(
     "--collections-file",
     type=click.Path(exists=True, file_okay=True, dir_okay=False),
     help=(
@@ -225,42 +206,56 @@ def validate(module_name) -> None:
     ),
 )
 @handle_exceptions
-def publish(
+def publish_project_cmd(
     module_names,
     source_paths,
     base_path,
-    github_owner,
-    github_branch,
-    skip_git,
     collections_file,
     inventory_file,
 ) -> None:
-    """Publish migrated Ansible roles to Ansible Automation Platform
-    wrap the roles in an Ansible Project format,
-    push the project to git, and sync to AAP.
+    """Create Ansible project structure from migrated roles.
 
-    Creates a new GitOps repository and pushes the deployment to it.
+    Wraps roles in an Ansible project format with playbooks, inventory,
+    collections requirements, and ansible.cfg.
+
     For single role: creates deployment at
     `<base-path>/ansible/deployments/{module_name}`.
     For multiple roles: creates a consolidated project at
     `<base-path>/ansible/deployments/ansible-project`.
     """
-    if not skip_git and not github_owner:
-        raise click.BadParameter(
-            "--github-owner is required when not using --skip-git",
-            param_hint="--github-owner",
-        )
-
-    publish_role(
-        module_names,
-        source_paths,
-        github_owner or "",
-        github_branch or "main",
+    project_dir = publish_project(
+        module_names=list(module_names),
+        source_paths=list(source_paths),
         base_path=base_path,
-        skip_git=skip_git,
         collections_file=collections_file,
         inventory_file=inventory_file,
     )
+    click.echo(f"\nProject created at: {project_dir}")
+
+
+@cli.command("publish-aap")
+@click.option(
+    "--repo-url",
+    required=True,
+    help="Git repository URL for the AAP project (e.g., https://github.com/org/repo.git).",
+)
+@click.option(
+    "--branch",
+    required=True,
+    help="Git branch for the AAP project.",
+)
+@handle_exceptions
+def publish_aap_cmd(repo_url, branch) -> None:
+    """Sync a git repository to Ansible Automation Platform.
+
+    Creates or updates an AAP Project pointing to the given repository URL
+    and branch, then triggers a project sync.
+
+    Requires AAP environment variables to be configured
+    (AAP_CONTROLLER_URL, AAP_ORG_NAME, and authentication credentials).
+    """
+    result = publish_aap(repo_url=repo_url, branch=branch)
+    click.echo(f"\nAAP project synced: {result.project_name} (ID: {result.project_id})")
 
 
 @cli.command()

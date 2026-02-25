@@ -15,7 +15,6 @@ sys.path.insert(0, str(project_root))
 from src.config.settings import (  # noqa: E402
     AAPSettings,
     AWSSettings,
-    GitHubSettings,
     LLMSettings,
     LoggingSettings,
     MoleculeSettings,
@@ -30,7 +29,6 @@ SETTINGS_CLASSES: list[tuple[str, Any, str]] = [
     ("OpenAI", OpenAISettings, "OPENAI_"),
     ("AWS Bedrock", AWSSettings, "AWS_"),
     ("Ansible Automation Platform", AAPSettings, "AAP_"),
-    ("GitHub", GitHubSettings, "GITHUB_"),
     ("Processing", ProcessingSettings, ""),
     ("Logging", LoggingSettings, ""),
     ("Molecule Testing", MoleculeSettings, ""),

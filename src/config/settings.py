@@ -202,26 +202,6 @@ class AAPSettings(BaseSettings):
         return errors
 
 
-class GitHubSettings(BaseSettings):
-    """GitHub integration configuration."""
-
-    model_config = SettingsConfigDict(env_prefix="GITHUB_", extra="ignore")
-
-    token: SecretStr | None = Field(
-        default=None,
-        description="GitHub API authentication token",
-    )
-    api_base: str = Field(
-        default="https://api.github.com",
-        description="GitHub API base URL",
-    )
-
-    @field_validator("api_base")
-    @classmethod
-    def normalize_api_base(cls, v: str) -> str:
-        return v.rstrip("/")
-
-
 class ProcessingSettings(BaseSettings):
     """Processing limits configuration."""
 
@@ -302,7 +282,6 @@ class Settings(BaseSettings):
     openai: OpenAISettings = Field(default_factory=OpenAISettings)
     aws: AWSSettings = Field(default_factory=AWSSettings)
     aap: AAPSettings = Field(default_factory=AAPSettings)
-    github: GitHubSettings = Field(default_factory=GitHubSettings)
     processing: ProcessingSettings = Field(default_factory=ProcessingSettings)
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     molecule: MoleculeSettings = Field(default_factory=MoleculeSettings)
