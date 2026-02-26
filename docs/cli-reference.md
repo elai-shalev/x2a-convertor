@@ -34,12 +34,13 @@ Options:
   --help  Show this message and exit.
 
 Commands:
-  analyze   Perform detailed analysis and create module migration plans
-  init      Initialize project with interactive message
-  migrate   Migrate project based on migration plan from analysis
-  publish   Publish migrated Ansible roles to Ansible Automation Platform...
-  report    Report execution artifacts to the x2a API
-  validate  Validate migrated module against original configuration
+  analyze          Perform detailed analysis and create module migration...
+  init             Initialize project with interactive message
+  migrate          Migrate project based on migration plan from analysis
+  publish-aap      Sync a git repository to Ansible Automation Platform.
+  publish-project  Create or append to an Ansible project for a migrated...
+  report           Report execution artifacts to the x2a API
+  validate         Validate migrated module against original configuration
 ```
 
 ## analyze
@@ -160,45 +161,79 @@ Options:
   --help                          Show this message and exit.
 ```
 
-## publish
+## publish-aap
 
-Publish migrated Ansible roles to Ansible Automation Platform
-wrap the roles in an Ansible Project format,
-push the project to git, and sync to AAP.
+Sync a git repository to Ansible Automation Platform.
 
-Creates a new GitOps repository and pushes the deployment to it.
-For single role: creates deployment at
-`<base-path>/ansible/deployments/{module_name}`.
-For multiple roles: creates a consolidated project at
-`<base-path>/ansible/deployments/ansible-project`.
+Creates or updates an AAP Project pointing to the given repository URL
+and branch, then triggers a project sync.
+
+Requires AAP environment variables to be configured
+(AAP_CONTROLLER_URL, AAP_ORG_NAME, and authentication credentials).
 
 
 ### Usage
 
 ```bash
-uv run app.py publish [OPTIONS] MODULE_NAMES
+uv run app.py publish-aap [OPTIONS]
+```
+
+### Options
+
+- `--target-repo` **[required]** (default: Sentinel.UNSET)
+  Git repository URL for the AAP project (e.g., https://github.com/org/repo.git).
+
+- `--target-branch` **[required]** (default: Sentinel.UNSET)
+  Git branch for the AAP project.
+
+- `--project-id` **[required]** (default: Sentinel.UNSET)
+  Migration project ID, used for AAP project naming and subdirectory reference.
+
+### Full Help
+
+```
+Usage: publish-aap [OPTIONS]
+
+  Sync a git repository to Ansible Automation Platform.
+
+  Creates or updates an AAP Project pointing to the given repository URL and
+  branch, then triggers a project sync.
+
+  Requires AAP environment variables to be configured (AAP_CONTROLLER_URL,
+  AAP_ORG_NAME, and authentication credentials).
+
+Options:
+  --target-repo TEXT    Git repository URL for the AAP project (e.g.,
+                        https://github.com/org/repo.git).  [required]
+  --target-branch TEXT  Git branch for the AAP project.  [required]
+  --project-id TEXT     Migration project ID, used for AAP project naming and
+                        subdirectory reference.  [required]
+  --help                Show this message and exit.
+```
+
+## publish-project
+
+Create or append to an Ansible project for a migrated module.
+
+PROJECT_ID is the migration project ID.
+MODULE_NAME is the module/role to add.
+
+On the first module, creates the full skeleton (ansible.cfg, collections,
+inventory). On subsequent modules, appends the role and playbook.
+
+
+### Usage
+
+```bash
+uv run app.py publish-project [OPTIONS] PROJECT_ID MODULE_NAME
 ```
 
 ### Arguments
 
-- `MODULE_NAMES`
+- `PROJECT_ID`
+- `MODULE_NAME`
 
 ### Options
-
-- `--source-paths` **[required]** (default: Sentinel.UNSET)
-  Path(s) to the migrated Ansible role directory(ies). Can be specified multiple times. Example: --source-paths ./ansible/roles/role1 --source-paths ./ansible/roles/role2
-
-- `--base-path` (default: Sentinel.UNSET)
-  Base path for constructing deployment path. If not provided, derived from first source-paths (parent of ansible/roles).
-
-- `--github-owner` (default: Sentinel.UNSET)
-  GitHub user or organization name where the repository will be created (required if not using --skip-git)
-
-- `--github-branch` (default: main)
-  GitHub branch to push to (default: main, ignored if --skip-git)
-
-- `--skip-git`
-  Skip git steps (create repo, commit, push). Files will be created in <base-path>/ansible/deployments/ only.
 
 - `--collections-file` (default: Sentinel.UNSET)
   Path to YAML/JSON file containing collections list. Format: [{"name": "collection.name", "version": "1.0.0"}]
@@ -209,38 +244,23 @@ uv run app.py publish [OPTIONS] MODULE_NAMES
 ### Full Help
 
 ```
-Usage: publish [OPTIONS] MODULE_NAMES...
+Usage: publish-project [OPTIONS] PROJECT_ID MODULE_NAME
 
-  Publish migrated Ansible roles to Ansible Automation Platform wrap the roles
-  in an Ansible Project format, push the project to git, and sync to AAP.
+  Create or append to an Ansible project for a migrated module.
 
-  Creates a new GitOps repository and pushes the deployment to it. For single
-  role: creates deployment at `<base-path>/ansible/deployments/{module_name}`.
-  For multiple roles: creates a consolidated project at `<base-
-  path>/ansible/deployments/ansible-project`.
+  PROJECT_ID is the migration project ID. MODULE_NAME is the module/role to
+  add.
+
+  On the first module, creates the full skeleton (ansible.cfg, collections,
+  inventory). On subsequent modules, appends the role and playbook.
 
 Options:
-  --source-paths DIRECTORY  Path(s) to the migrated Ansible role
-                            directory(ies). Can be specified multiple times.
-                            Example: --source-paths ./ansible/roles/role1
-                            --source-paths ./ansible/roles/role2  [required]
-  --base-path DIRECTORY     Base path for constructing deployment path. If not
-                            provided, derived from first source-paths (parent
-                            of ansible/roles).
-  --github-owner TEXT       GitHub user or organization name where the
-                            repository will be created (required if not using
-                            --skip-git)
-  --github-branch TEXT      GitHub branch to push to (default: main, ignored
-                            if --skip-git)
-  --skip-git                Skip git steps (create repo, commit, push). Files
-                            will be created in <base-
-                            path>/ansible/deployments/ only.
-  --collections-file FILE   Path to YAML/JSON file containing collections
-                            list. Format: [{"name": "collection.name",
-                            "version": "1.0.0"}]
-  --inventory-file FILE     Path to YAML/JSON file containing inventory
-                            structure. Format: {"all": {"children": {...}}}
-  --help                    Show this message and exit.
+  --collections-file FILE  Path to YAML/JSON file containing collections list.
+                           Format: [{"name": "collection.name", "version":
+                           "1.0.0"}]
+  --inventory-file FILE    Path to YAML/JSON file containing inventory
+                           structure. Format: {"all": {"children": {...}}}
+  --help                   Show this message and exit.
 ```
 
 ## report

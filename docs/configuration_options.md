@@ -62,13 +62,6 @@ Auto-generated from `src/config/settings.py`.
 | `AAP_SCM_CREDENTIAL_ID` | integer | - | Credential ID for private repos |
 | `AAP_GALAXY_REPOSITORY` | string | `published` | Galaxy repository to search (published, staging, community) |
 
-## GitHub Configuration
-
-| Variable | Type | Default | Description |
-|----------|------|---------|-------------|
-| `GITHUB_TOKEN` | secret | - | GitHub API authentication token |
-| `GITHUB_API_BASE` | string | `https://api.github.com` | GitHub API base URL |
-
 ## Processing Configuration
 
 | Variable | Type | Default | Description |
