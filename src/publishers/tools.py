@@ -643,16 +643,16 @@ def sync_to_aap(
             scm_credential_id=scm_credential_id,
         )
 
-        project_id = int(project.get("id", 0))
-        if not project_id:
+        aap_project_id = int(project.get("id", 0))
+        if not aap_project_id:
             return AAPSyncResult.from_error("AAP API did not return a project id")
 
-        update = client.start_project_update(project_id=project_id)
+        update = client.start_project_update(project_id=aap_project_id)
 
         return AAPSyncResult(
             enabled=True,
             project_name=project_name,
-            project_id=project_id,
+            project_id=aap_project_id,
             project_update_id=int(update["id"]) if "id" in update else None,
             project_update_status=update.get("status", ""),
         )
