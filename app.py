@@ -235,7 +235,9 @@ def publish_aap_cmd(target_repo, target_branch, project_id) -> None:
     Requires AAP environment variables to be configured
     (AAP_CONTROLLER_URL, AAP_ORG_NAME, and authentication credentials).
     """
-    result = publish_aap(target_repo=target_repo, target_branch=target_branch, project_id=project_id)
+    result = publish_aap(
+        target_repo=target_repo, target_branch=target_branch, project_id=project_id
+    )
     click.echo(f"\nAAP project synced: {result.project_name} (ID: {result.project_id})")
 
 
