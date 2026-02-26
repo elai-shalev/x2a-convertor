@@ -90,7 +90,9 @@ def test_sync_to_aap_happy_flow(monkeypatch):
     monkeypatch.setattr(tools_module, "AAPClient", FakeClient)
 
     result = sync_to_aap(
-        repository_url="https://github.com/acme/repo.git", branch="main"
+        repository_url="https://github.com/acme/repo.git",
+        branch="main",
+        project_id="my-migration",
     )
     assert result.enabled is True
     assert result.error == ""
@@ -98,6 +100,7 @@ def test_sync_to_aap_happy_flow(monkeypatch):
     assert result.project_update_id == 100
     assert result.project_update_status == "successful"
     assert calls.get("org") == "Default"
+    assert calls.get("project_name") == "my-migration"
 
 
 def test_sync_to_aap_client_failure_returns_error(monkeypatch):

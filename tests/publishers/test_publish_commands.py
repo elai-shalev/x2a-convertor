@@ -1,5 +1,7 @@
 """Tests for publish_project and publish_aap functions."""
 
+import os
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -11,81 +13,84 @@ from src.publishers.tools import AAPSyncResult
 class TestPublishProject:
     """Tests for the publish_project function."""
 
-    def test_single_role_creates_structure(self, sample_role_dir, tmp_path):
-        base = tmp_path / "output"
-        base.mkdir()
+    def test_first_module_creates_skeleton(self, project_with_module):
+        project_dir, module_name = project_with_module
+        old_cwd = os.getcwd()
+        os.chdir(Path(project_dir).parent)
+        try:
+            pid = Path(project_dir).name
+            result = publish_project(project_id=pid, module_name=module_name)
 
-        result = publish_project(
-            module_names=["my_role"],
-            source_paths=[sample_role_dir],
-            base_path=str(base),
-        )
+            project = Path(result)
+            assert (project / "ansible.cfg").exists()
+            assert (project / "collections" / "requirements.yml").exists()
+            assert (project / "inventory" / "hosts.yml").exists()
+            assert (project / "roles" / module_name / "tasks" / "main.yml").exists()
+            assert (project / "playbooks" / f"run_{module_name}.yml").exists()
+        finally:
+            os.chdir(old_cwd)
 
-        assert "my_role" in result
-        from pathlib import Path
+    def test_second_module_appends_to_existing(self, second_module_in_project):
+        project_dir, mod_a, mod_b = second_module_in_project
+        old_cwd = os.getcwd()
+        os.chdir(Path(project_dir).parent)
+        try:
+            pid = Path(project_dir).name
 
-        project = Path(result)
-        assert (project / "ansible.cfg").exists()
-        assert (project / "collections" / "requirements.yml").exists()
-        assert (project / "inventory" / "hosts.yml").exists()
-        assert (project / "roles" / "my_role" / "tasks" / "main.yml").exists()
-        assert (project / "playbooks" / "run_my_role.yml").exists()
+            # First module creates skeleton
+            publish_project(project_id=pid, module_name=mod_a)
+            ansible_project = Path(pid) / "ansible-project"
+            cfg_mtime = (ansible_project / "ansible.cfg").stat().st_mtime
 
-    def test_multiple_roles_creates_structure(
-        self, sample_role_dir, sample_role_dir2, tmp_path
-    ):
-        base = tmp_path / "output"
-        base.mkdir()
+            # Second module appends
+            publish_project(project_id=pid, module_name=mod_b)
 
-        result = publish_project(
-            module_names=["role_a", "role_b"],
-            source_paths=[sample_role_dir, sample_role_dir2],
-            base_path=str(base),
-        )
+            # ansible.cfg should NOT be overwritten
+            assert (ansible_project / "ansible.cfg").stat().st_mtime == cfg_mtime
 
-        from pathlib import Path
+            # Both roles and playbooks should exist
+            assert (ansible_project / "roles" / mod_a).exists()
+            assert (ansible_project / "roles" / mod_b).exists()
+            assert (ansible_project / "playbooks" / f"run_{mod_a}.yml").exists()
+            assert (ansible_project / "playbooks" / f"run_{mod_b}.yml").exists()
+        finally:
+            os.chdir(old_cwd)
 
-        project = Path(result)
-        assert (project / "roles" / "role_a").exists()
-        assert (project / "roles" / "role_b").exists()
-        assert (project / "playbooks" / "run_role_a.yml").exists()
-        assert (project / "playbooks" / "run_role_b.yml").exists()
+    def test_missing_source_role_raises(self, tmp_path):
+        old_cwd = os.getcwd()
+        os.chdir(tmp_path)
+        try:
+            # No role directory exists at the expected path
+            (tmp_path / "proj" / "modules" / "missing_mod" / "ansible" / "roles").mkdir(
+                parents=True
+            )
+            with pytest.raises(FileNotFoundError, match="Source role directory not found"):
+                publish_project(project_id="proj", module_name="missing_mod")
+        finally:
+            os.chdir(old_cwd)
 
-    def test_mismatched_names_and_paths_raises(self, sample_role_dir):
-        with pytest.raises(ValueError, match="must match"):
-            publish_project(
-                module_names=["a", "b"],
-                source_paths=[sample_role_dir],
+    def test_with_collections_file(self, project_with_module, tmp_path):
+        project_dir, module_name = project_with_module
+        old_cwd = os.getcwd()
+        os.chdir(Path(project_dir).parent)
+        try:
+            pid = Path(project_dir).name
+
+            collections_file = tmp_path / "collections.yml"
+            collections_file.write_text(
+                '- name: community.general\n  version: ">=5.0.0"\n'
             )
 
-    def test_missing_source_path_raises(self, tmp_path):
-        with pytest.raises(FileNotFoundError):
-            publish_project(
-                module_names=["my_role"],
-                source_paths=[str(tmp_path / "nonexistent")],
-                base_path=str(tmp_path),
+            result = publish_project(
+                project_id=pid,
+                module_name=module_name,
+                collections_file=str(collections_file),
             )
 
-    def test_with_collections_file(self, sample_role_dir, tmp_path):
-        base = tmp_path / "output"
-        base.mkdir()
-
-        collections_file = tmp_path / "collections.yml"
-        collections_file.write_text(
-            '- name: community.general\n  version: ">=5.0.0"\n'
-        )
-
-        result = publish_project(
-            module_names=["my_role"],
-            source_paths=[sample_role_dir],
-            base_path=str(base),
-            collections_file=str(collections_file),
-        )
-
-        from pathlib import Path
-
-        project = Path(result)
-        assert (project / "collections" / "requirements.yml").exists()
+            project = Path(result)
+            assert (project / "collections" / "requirements.yml").exists()
+        finally:
+            os.chdir(old_cwd)
 
 
 class TestPublishAAP:
@@ -94,8 +99,9 @@ class TestPublishAAP:
     def test_aap_not_configured_raises(self):
         with pytest.raises(RuntimeError, match="not configured"):
             publish_aap(
-                repo_url="https://github.com/org/repo.git",
-                branch="main",
+                target_repo="https://github.com/org/repo.git",
+                target_branch="main",
+                project_id="proj-1",
             )
 
     @patch("src.publishers.publish.sync_to_aap")
@@ -104,8 +110,9 @@ class TestPublishAAP:
 
         with pytest.raises(RuntimeError, match="Connection refused"):
             publish_aap(
-                repo_url="https://github.com/org/repo.git",
-                branch="main",
+                target_repo="https://github.com/org/repo.git",
+                target_branch="main",
+                project_id="proj-1",
             )
 
     @patch("src.publishers.publish.sync_to_aap")
@@ -119,8 +126,9 @@ class TestPublishAAP:
         )
 
         result = publish_aap(
-            repo_url="https://github.com/org/repo.git",
-            branch="main",
+            target_repo="https://github.com/org/repo.git",
+            target_branch="main",
+            project_id="proj-1",
         )
 
         assert result.project_name == "test-project"
@@ -128,4 +136,5 @@ class TestPublishAAP:
         mock_sync.assert_called_once_with(
             repository_url="https://github.com/org/repo.git",
             branch="main",
+            project_id="proj-1",
         )
