@@ -167,28 +167,8 @@ def validate(module_name) -> None:
 
 
 @cli.command("publish-project")
-@click.argument("module_names", nargs=-1, required=True)
-@click.option(
-    "--source-paths",
-    multiple=True,
-    type=click.Path(exists=True, file_okay=False, dir_okay=True),
-    required=True,
-    help=(
-        "Path(s) to the migrated Ansible role directory(ies). "
-        "Can be specified multiple times. "
-        "Example: --source-paths ./ansible/roles/role1 "
-        "--source-paths ./ansible/roles/role2"
-    ),
-)
-@click.option(
-    "--base-path",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True),
-    help=(
-        "Base path for constructing deployment path. "
-        "If not provided, derived from first source-paths "
-        "(parent of ansible/roles)."
-    ),
-)
+@click.argument("project_id")
+@click.argument("module_name")
 @click.option(
     "--collections-file",
     type=click.Path(exists=True, file_okay=True, dir_okay=False),
@@ -207,26 +187,22 @@ def validate(module_name) -> None:
 )
 @handle_exceptions
 def publish_project_cmd(
-    module_names,
-    source_paths,
-    base_path,
+    project_id,
+    module_name,
     collections_file,
     inventory_file,
 ) -> None:
-    """Create Ansible project structure from migrated roles.
+    """Create or append to an Ansible project for a migrated module.
 
-    Wraps roles in an Ansible project format with playbooks, inventory,
-    collections requirements, and ansible.cfg.
+    PROJECT_ID is the migration project ID.
+    MODULE_NAME is the module/role to add.
 
-    For single role: creates deployment at
-    `<base-path>/ansible/deployments/{module_name}`.
-    For multiple roles: creates a consolidated project at
-    `<base-path>/ansible/deployments/ansible-project`.
+    On the first module, creates the full skeleton (ansible.cfg, collections,
+    inventory). On subsequent modules, appends the role and playbook.
     """
     project_dir = publish_project(
-        module_names=list(module_names),
-        source_paths=list(source_paths),
-        base_path=base_path,
+        project_id=project_id,
+        module_name=module_name,
         collections_file=collections_file,
         inventory_file=inventory_file,
     )
@@ -235,17 +211,22 @@ def publish_project_cmd(
 
 @cli.command("publish-aap")
 @click.option(
-    "--repo-url",
+    "--target-repo",
     required=True,
     help="Git repository URL for the AAP project (e.g., https://github.com/org/repo.git).",
 )
 @click.option(
-    "--branch",
+    "--target-branch",
     required=True,
     help="Git branch for the AAP project.",
 )
+@click.option(
+    "--project-id",
+    required=True,
+    help="Migration project ID, used for AAP project naming and subdirectory reference.",
+)
 @handle_exceptions
-def publish_aap_cmd(repo_url, branch) -> None:
+def publish_aap_cmd(target_repo, target_branch, project_id) -> None:
     """Sync a git repository to Ansible Automation Platform.
 
     Creates or updates an AAP Project pointing to the given repository URL
@@ -254,7 +235,7 @@ def publish_aap_cmd(repo_url, branch) -> None:
     Requires AAP environment variables to be configured
     (AAP_CONTROLLER_URL, AAP_ORG_NAME, and authentication credentials).
     """
-    result = publish_aap(repo_url=repo_url, branch=branch)
+    result = publish_aap(target_repo=target_repo, target_branch=target_branch, project_id=project_id)
     click.echo(f"\nAAP project synced: {result.project_name} (ID: {result.project_id})")
 
 

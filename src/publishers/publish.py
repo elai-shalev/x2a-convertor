@@ -21,131 +21,100 @@ logger = get_logger(__name__)
 
 
 def publish_project(
-    module_names: list[str] | tuple[str, ...],
-    source_paths: list[str] | tuple[str, ...],
-    base_path: str | None = None,
+    project_id: str,
+    module_name: str,
     collections_file: str | Path | None = None,
     inventory_file: str | Path | None = None,
-    collections: list[dict[str, str]] | None = None,
-    inventory: dict | None = None,
 ) -> str:
-    """Create an Ansible project structure from migrated roles.
+    """Create or append to an Ansible project structure for a migrated role.
 
-    Creates a complete Ansible project with directory structure, role copies,
-    wrapper playbooks, ansible.cfg, collections requirements, and inventory.
+    On the first module migration (no ansible.cfg yet), creates the full
+    skeleton: directory structure, ansible.cfg, collections requirements,
+    and inventory. On subsequent modules, only the new role and playbook
+    are added.
 
     Args:
-        module_names: Name(s) of the role(s) to include.
-        source_paths: Path(s) to the migrated Ansible role directory(ies).
-        base_path: Base path for constructing deployment path.
-            If not provided, derived from the first source path.
+        project_id: Migration project ID, used to locate the Ansible Project dir.
+        module_name: Name of the single module/role to add.
         collections_file: Path to YAML/JSON file containing collections list.
         inventory_file: Path to YAML/JSON file containing inventory structure.
-        collections: List of collection dicts with 'name' and optional 'version'.
-        inventory: Inventory structure as dict. If None, uses sample inventory.
 
     Returns:
-        Absolute path to the created project directory.
+        Absolute path to the Ansible project directory.
 
     Raises:
-        ValueError: If input validation fails.
-        FileNotFoundError: If source paths or generated files are missing.
+        FileNotFoundError: If the source role directory does not exist.
         OSError: If file operations fail.
     """
-    role_names = list(module_names)
-    role_paths = list(source_paths)
+    source_role_path = Path(project_id) / "modules" / module_name / "ansible" / "roles" / module_name
+    ansible_project_dir = Path(project_id) / "ansible-project"
 
-    if collections is None and collections_file:
-        collections = load_collections_file(collections_file)
-
-    if inventory is None and inventory_file:
-        inventory = load_inventory_file(inventory_file)
-
-    if len(role_names) != len(role_paths):
-        error_msg = (
-            f"Number of role names ({len(role_names)}) must match "
-            f"number of role paths ({len(role_paths)})"
-        )
+    if not source_role_path.is_dir():
+        error_msg = f"Source role directory not found: {source_role_path}"
         logger.error(error_msg)
-        raise ValueError(error_msg)
+        raise FileNotFoundError(error_msg)
 
-    role_list = ", ".join(role_names)
-    logger.info(f"Creating Ansible project for {len(role_names)} role(s): {role_list}")
+    publish_dir = str(ansible_project_dir)
+    is_first_module = not (ansible_project_dir / "ansible.cfg").exists()
 
-    # Determine deployment path
-    first_role_path_obj = Path(role_paths[0])
-    if base_path:
-        base_path_obj = Path(base_path)
-        if len(role_names) == 1:
-            deployment_path = base_path_obj / "ansible" / "deployments" / role_names[0]
-        else:
-            deployment_path = (
-                base_path_obj / "ansible" / "deployments" / "ansible-project"
-            )
-    else:
-        # Extract ansible path from role_path:
-        # <path>/ansible/roles/{role} -> <path>/ansible
-        ansible_path = first_role_path_obj.parent.parent
-        if len(role_names) == 1:
-            deployment_path = ansible_path / "deployments" / role_names[0]
-        else:
-            deployment_path = ansible_path / "deployments" / "ansible-project"
+    if is_first_module:
+        logger.info(f"Creating new Ansible project for module '{module_name}' in {publish_dir}")
 
-    publish_dir = str(deployment_path)
-
-    # 1. Create directory structure
-    create_directory_structure(
-        base_path=publish_dir,
-        structure=["collections", "inventory", "roles", "playbooks"],
-    )
-
-    # 2. Copy all role directories
-    for role_name, role_path in zip(role_names, role_paths, strict=True):
-        destination = f"{publish_dir}/roles/{role_name}"
-        logger.info(f"Copying role {role_name} from {role_path}")
-        copy_role_directory(source_role_path=role_path, destination_path=destination)
-
-    # 3. Generate wrapper playbooks for each role
-    for role_name in role_names:
-        generate_playbook_yaml(
-            file_path=f"{publish_dir}/playbooks/run_{role_name}.yml",
-            name=f"Run {role_name}",
-            role_name=role_name,
+        # Create directory structure
+        create_directory_structure(
+            base_path=publish_dir,
+            structure=["collections", "inventory", "roles", "playbooks"],
         )
 
-    # 4. Generate ansible.cfg
-    generate_ansible_cfg(f"{publish_dir}/ansible.cfg")
+        # Generate ansible.cfg
+        generate_ansible_cfg(f"{publish_dir}/ansible.cfg")
 
-    # 5. Generate collections/requirements.yml
-    generate_collections_requirements(
-        f"{publish_dir}/collections/requirements.yml", collections=collections
+        # Generate collections/requirements.yml
+        collections = None
+        if collections_file:
+            collections = load_collections_file(collections_file)
+        generate_collections_requirements(
+            f"{publish_dir}/collections/requirements.yml", collections=collections
+        )
+
+        # Generate inventory file
+        inventory = None
+        if inventory_file:
+            inventory = load_inventory_file(inventory_file)
+        generate_inventory_file(f"{publish_dir}/inventory/hosts.yml", inventory=inventory)
+    else:
+        logger.info(f"Appending module '{module_name}' to existing Ansible project at {publish_dir}")
+
+    # Copy role directory
+    destination = f"{publish_dir}/roles/{module_name}"
+    logger.info(f"Copying role {module_name} from {source_role_path}")
+    copy_role_directory(source_role_path=str(source_role_path), destination_path=destination)
+
+    # Generate wrapper playbook
+    generate_playbook_yaml(
+        file_path=f"{publish_dir}/playbooks/run_{module_name}.yml",
+        name=f"Run {module_name}",
+        role_name=module_name,
     )
 
-    # 6. Generate inventory file
-    generate_inventory_file(f"{publish_dir}/inventory/hosts.yml", inventory=inventory)
-
-    # 7. Verify all required files exist
+    # Verify files for this role
     required_files = [
-        f"{publish_dir}/ansible.cfg",
-        f"{publish_dir}/collections/requirements.yml",
-        f"{publish_dir}/inventory/hosts.yml",
+        f"{publish_dir}/roles/{module_name}",
+        f"{publish_dir}/playbooks/run_{module_name}.yml",
     ]
-    for role_name in role_names:
-        required_files.append(f"{publish_dir}/roles/{role_name}")
-        required_files.append(f"{publish_dir}/playbooks/run_{role_name}.yml")
-
     verify_files_exist(file_paths=required_files)
 
-    logger.info(f"Ansible project created successfully at {publish_dir}")
-    return str(deployment_path.resolve())
+    logger.info(f"Module '{module_name}' published successfully to {publish_dir}")
+    return str(ansible_project_dir.resolve())
 
 
-def publish_aap(repo_url: str, branch: str) -> AAPSyncResult:
+def publish_aap(target_repo: str, target_branch: str, project_id: str) -> AAPSyncResult:
     """Connect to AAP Controller and create/update a project pointing to the given repo.
 
     Args:
-        repo_url: Git repository URL (e.g., https://github.com/org/repo.git).
-        branch: Git branch name.
+        target_repo: Git repository URL (e.g., https://github.com/org/repo.git).
+        target_branch: Git branch name.
+        project_id: Migration project ID, used for AAP project naming and subdirectory reference.
 
     Returns:
         AAPSyncResult with sync outcome.
@@ -153,9 +122,9 @@ def publish_aap(repo_url: str, branch: str) -> AAPSyncResult:
     Raises:
         RuntimeError: If AAP is not configured or sync fails.
     """
-    logger.info(f"Syncing to AAP: repo={repo_url} branch={branch}")
+    logger.info(f"Syncing to AAP: repo={target_repo} branch={target_branch} project_id={project_id}")
 
-    result = sync_to_aap(repository_url=repo_url, branch=branch)
+    result = sync_to_aap(repository_url=target_repo, branch=target_branch, project_id=project_id)
 
     if not result.enabled:
         raise RuntimeError(
