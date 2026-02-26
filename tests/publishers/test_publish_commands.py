@@ -15,7 +15,7 @@ class TestPublishProject:
 
     def test_first_module_creates_skeleton(self, project_with_module):
         project_dir, module_name = project_with_module
-        old_cwd = os.getcwd()
+        old_cwd = Path.cwd()
         os.chdir(Path(project_dir).parent)
         try:
             pid = Path(project_dir).name
@@ -32,7 +32,7 @@ class TestPublishProject:
 
     def test_second_module_appends_to_existing(self, second_module_in_project):
         project_dir, mod_a, mod_b = second_module_in_project
-        old_cwd = os.getcwd()
+        old_cwd = Path.cwd()
         os.chdir(Path(project_dir).parent)
         try:
             pid = Path(project_dir).name
@@ -57,7 +57,7 @@ class TestPublishProject:
             os.chdir(old_cwd)
 
     def test_missing_source_role_raises(self, tmp_path):
-        old_cwd = os.getcwd()
+        old_cwd = Path.cwd()
         os.chdir(tmp_path)
         try:
             # No role directory exists at the expected path
@@ -71,7 +71,7 @@ class TestPublishProject:
 
     def test_with_collections_file(self, project_with_module, tmp_path):
         project_dir, module_name = project_with_module
-        old_cwd = os.getcwd()
+        old_cwd = Path.cwd()
         os.chdir(Path(project_dir).parent)
         try:
             pid = Path(project_dir).name
