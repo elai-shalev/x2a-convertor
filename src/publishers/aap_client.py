@@ -249,7 +249,9 @@ def infer_aap_project_name(repository_url: str) -> str:
     return name
 
 
-def infer_aap_project_description(repository_url: str, branch: str, *, project_id: str = "") -> str:
+def infer_aap_project_description(
+    repository_url: str, branch: str, *, project_id: str = ""
+) -> str:
     repo = repository_url.strip()
     br = branch.strip() or "main"
     desc = f"GitOps project from {repo} (branch: {br})"

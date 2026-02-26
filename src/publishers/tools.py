@@ -588,7 +588,9 @@ def verify_files_exist(file_paths: list[str]) -> None:
     logger.info("All files verified successfully")
 
 
-def sync_to_aap(repository_url: str, branch: str, project_id: str = "") -> AAPSyncResult:
+def sync_to_aap(
+    repository_url: str, branch: str, project_id: str = ""
+) -> AAPSyncResult:
     """Upsert an AAP Project pointing at the provided repository and trigger a sync.
 
     This is env-driven and optional:
@@ -618,14 +620,20 @@ def sync_to_aap(repository_url: str, branch: str, project_id: str = "") -> AAPSy
 
     # Get project name from settings or use project_id or infer from repository URL
     settings = get_settings()
-    project_name = settings.aap.project_name or project_id or infer_aap_project_name(repository_url)
+    project_name = (
+        settings.aap.project_name
+        or project_id
+        or infer_aap_project_name(repository_url)
+    )
     scm_credential_id = settings.aap.scm_credential_id
 
     try:
         client = AAPClient(cfg)
         assert cfg.organization_name  # Validated by from_env()
         org_id = client.find_organization_id(name=cfg.organization_name)
-        description = infer_aap_project_description(repository_url, branch, project_id=project_id)
+        description = infer_aap_project_description(
+            repository_url, branch, project_id=project_id
+        )
         project = client.upsert_project(
             org_id=org_id,
             name=project_name,
@@ -650,5 +658,3 @@ def sync_to_aap(repository_url: str, branch: str, project_id: str = "") -> AAPSy
         )
     except (requests.exceptions.RequestException, RuntimeError, ValueError) as e:
         return AAPSyncResult.from_error(str(e))
-
-

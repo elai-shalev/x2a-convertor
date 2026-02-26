@@ -46,7 +46,9 @@ def publish_project(
         FileNotFoundError: If the source role directory does not exist.
         OSError: If file operations fail.
     """
-    source_role_path = Path(project_id) / "modules" / module_name / "ansible" / "roles" / module_name
+    source_role_path = (
+        Path(project_id) / "modules" / module_name / "ansible" / "roles" / module_name
+    )
     ansible_project_dir = Path(project_id) / "ansible-project"
 
     if not source_role_path.is_dir():
@@ -58,7 +60,9 @@ def publish_project(
     is_first_module = not (ansible_project_dir / "ansible.cfg").exists()
 
     if is_first_module:
-        logger.info(f"Creating new Ansible project for module '{module_name}' in {publish_dir}")
+        logger.info(
+            f"Creating new Ansible project for module '{module_name}' in {publish_dir}"
+        )
 
         # Create directory structure
         create_directory_structure(
@@ -81,14 +85,20 @@ def publish_project(
         inventory = None
         if inventory_file:
             inventory = load_inventory_file(inventory_file)
-        generate_inventory_file(f"{publish_dir}/inventory/hosts.yml", inventory=inventory)
+        generate_inventory_file(
+            f"{publish_dir}/inventory/hosts.yml", inventory=inventory
+        )
     else:
-        logger.info(f"Appending module '{module_name}' to existing Ansible project at {publish_dir}")
+        logger.info(
+            f"Appending module '{module_name}' to existing Ansible project at {publish_dir}"
+        )
 
     # Copy role directory
     destination = f"{publish_dir}/roles/{module_name}"
     logger.info(f"Copying role {module_name} from {source_role_path}")
-    copy_role_directory(source_role_path=str(source_role_path), destination_path=destination)
+    copy_role_directory(
+        source_role_path=str(source_role_path), destination_path=destination
+    )
 
     # Generate wrapper playbook
     generate_playbook_yaml(
@@ -122,9 +132,13 @@ def publish_aap(target_repo: str, target_branch: str, project_id: str) -> AAPSyn
     Raises:
         RuntimeError: If AAP is not configured or sync fails.
     """
-    logger.info(f"Syncing to AAP: repo={target_repo} branch={target_branch} project_id={project_id}")
+    logger.info(
+        f"Syncing to AAP: repo={target_repo} branch={target_branch} project_id={project_id}"
+    )
 
-    result = sync_to_aap(repository_url=target_repo, branch=target_branch, project_id=project_id)
+    result = sync_to_aap(
+        repository_url=target_repo, branch=target_branch, project_id=project_id
+    )
 
     if not result.enabled:
         raise RuntimeError(

@@ -64,7 +64,9 @@ class TestPublishProject:
             (tmp_path / "proj" / "modules" / "missing_mod" / "ansible" / "roles").mkdir(
                 parents=True
             )
-            with pytest.raises(FileNotFoundError, match="Source role directory not found"):
+            with pytest.raises(
+                FileNotFoundError, match="Source role directory not found"
+            ):
                 publish_project(project_id="proj", module_name="missing_mod")
         finally:
             os.chdir(old_cwd)
