@@ -25,13 +25,12 @@ def docker_command(
     volume_mount: str,
 ) -> str:
     """Build a podman run command with the given env vars."""
-    env_lines = "\n".join(f"  -e {var} \\" for var in env_vars)
-    return f"""\
-podman run --rm -ti \\
-  -v {volume_mount} \\
-{env_lines}
-  {image} \\
-  {command}"""
+    parts = [f"podman run --rm -ti \\", f"  -v {volume_mount} \\"]
+    for var in env_vars:
+        parts.append(f"  -e {var} \\")
+    parts.append(f"  {image} \\")
+    parts.append(f"  {command}")
+    return "\n".join(parts)
 
 
 def generate_usage_doc(content: dict):
@@ -97,15 +96,25 @@ def generate_usage_doc(content: dict):
     lines.append(shared["descriptions"]["migrate"])
     lines.append("")
 
-    # Publish section
-    lines.append("## Publish")
+    # Publish Project section
+    lines.append("## Publish Project")
     lines.append("")
     lines.append("```bash")
-    lines.append(config["commands"]["publish"])
+    lines.append(config["commands"]["publish_project"])
     lines.append("```")
     lines.append("")
-    lines.append(shared["descriptions"]["publish"])
-    lines.append(shared["publish_output_paths"].rstrip())
+    lines.append(shared["descriptions"]["publish_project"])
+    lines.append(shared["publish_project_output_paths"].rstrip())
+    lines.append("")
+
+    # Publish AAP section
+    lines.append("## Publish to AAP (Optional)")
+    lines.append("")
+    lines.append("```bash")
+    lines.append(config["commands"]["publish_aap"])
+    lines.append("```")
+    lines.append("")
+    lines.append(shared["descriptions"]["publish_aap"])
 
     if config.get("include_notes"):
         lines.append("")
@@ -195,15 +204,25 @@ def generate_docker_usage_doc(content: dict):
     lines.append(shared["descriptions"]["migrate"])
     lines.append("")
 
-    # Publish section
-    lines.append("## Publish")
+    # Publish Project section
+    lines.append("## Publish Project")
     lines.append("")
     lines.append("```bash")
-    lines.append(wrap_cmd(config["commands"]["publish"]))
+    lines.append(wrap_cmd(config["commands"]["publish_project"]))
     lines.append("```")
     lines.append("")
-    lines.append(shared["descriptions"]["publish"])
-    lines.append(shared["publish_output_paths"].rstrip())
+    lines.append(shared["descriptions"]["publish_project"])
+    lines.append(shared["publish_project_output_paths"].rstrip())
+    lines.append("")
+
+    # Publish AAP section
+    lines.append("## Publish to AAP (Optional)")
+    lines.append("")
+    lines.append("```bash")
+    lines.append(wrap_cmd(config["commands"]["publish_aap"]))
+    lines.append("```")
+    lines.append("")
+    lines.append(shared["descriptions"]["publish_aap"])
 
     if config.get("include_notes"):
         lines.append("")

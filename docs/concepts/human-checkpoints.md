@@ -282,53 +282,50 @@ ansible-playbook -i test-inventory site.yml --tags nginx
 
 ### Trigger
 
-After `app.py publish` completes
+After `app.py publish-project` completes (and optionally `publish-aap`)
 
 ### Artifact
 
-- GitOps repository: `<github-owner>/<role>-gitops` on GitHub
-- Local deployment directory: `<base-path>/ansible/deployments/{role}/`
-- AAP Project + Project Update (SCM sync)
+- Local Ansible project directory: `<project-id>/ansible-project/`
+- AAP Project + Project Update (if `publish-aap` was run)
 
 ### Review Checklist
 
 - [ ] Deployment structure follows Ansible Project conventions (collections/, inventory/, roles/, playbooks/)
-- [ ] GitHub repository or branch created successfully
 - [ ] Local deployment structure created successfully
-- [ ] AAP Project was created/updated and a Project Update was triggered successfully
+- [ ] AAP Project was created/updated and a Project Update was triggered successfully (if using `publish-aap`)
 
 ### Decision Points
 
-1. **Repository issues**
+1. **Project structure issues**
 
-   - Delete and re-run if repository creation failed
-   - Use `--skip-git` to generate files locally only for testing
+   - Re-run `publish-project` to regenerate; on first module the full skeleton is recreated
 
 2. **Configuration adjustments**
 
-   - Edit generated files in deployment directory
-   - Re-run publish if major changes needed
+   - Edit generated files in the project directory
+   - Re-run `publish-project` if major changes needed
 
 3. **Approve for production**
 
-   - Repository ready for AAP integration
-   - Document any manual configuration steps needed
+   - Push project to a git repository
+   - Run `publish-aap` to sync to AAP Controller
 
 4. **AAP integration issues**
 
-   - AAP integration is **env-driven** and runs only after a successful Git push
+   - AAP integration is **env-driven** via the separate `publish-aap` command
    - Required when enabled:
      - `AAP_CONTROLLER_URL`
      - `AAP_ORG_NAME`
      - Auth: `AAP_OAUTH_TOKEN` **or** `AAP_USERNAME` + `AAP_PASSWORD`
    - Optional:
-     - `AAP_PROJECT_NAME` (otherwise inferred from repository URL)
+     - `AAP_PROJECT_NAME` (otherwise uses `--project-id` or inferred from repository URL)
      - `AAP_SCM_CREDENTIAL_ID` (required for private SCM repos)
      - `AAP_CA_BUNDLE` (path to PEM/CRT CA cert for private PKI / self-signed)
      - `AAP_VERIFY_SSL` (true/false)
      - `AAP_TIMEOUT_S`
      - `AAP_API_PREFIX` (default: `/api/controller/v2`)
-   - If AAP sync fails, publishing still completes; check the logs and re-run `publish` after fixing AAP configuration (or trigger a sync manually from the AAP UI)
+   - If AAP sync fails, re-run `publish-aap` after fixing AAP configuration (or trigger a sync manually from the AAP UI)
 
    For information on obtaining AAP Tokens and credentials, see the [AAP documentation](https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.6/html/access_management_and_authentication/gw-token-based-authentication).
 

@@ -41,12 +41,11 @@ export AAP_ORG_NAME=your-org-name
 export AAP_OAUTH_TOKEN=your-oauth-token
 export AAP_GALAXY_REPOSITORY=published  # published, staging, or community
 
-# For publish command
-export GITHUB_TOKEN=your-github-token
+# For publish-aap command (optional)
 export AAP_CONTROLLER_URL=your-aap-url
 
 # For AAP Authentication
-export AAP_OAUTH_TOKEN=your-oauth-token or export AAP_USERNAME=your-username and export AAP_PASSWORD=your-password
+export AAP_OAUTH_TOKEN=your-oauth-token  # or export AAP_USERNAME=your-username and export AAP_PASSWORD=your-password
 
 # AAP integration extra configuration (optional)
 export AAP_CA_BUNDLE=your-ca-bundle-path
@@ -91,32 +90,38 @@ uv run app.py migrate \
 
 This will generate real Ansible code, primarily in `ansible/roles/nginx_multisite` with all details. When AAP env vars are set, it will also search your Private Automation Hub for reusable collections (see [AAP Discovery Agent]({% link concepts/export-agents.md %}#aap-discovery-agent-optional)).
 
-## Publish
+## Publish Project
 
 ```bash
-uv run app.py publish "nginx_multisite" \
-  --source-paths ./ansible/roles/nginx_multisite \
-  --github-owner  companyName \
-  --github-branch main
+uv run app.py publish-project my-migration-project nginx_multisite
 
 ```
 
-This will generate the deployments for the role, push it to GitHub, and (when AAP env vars are set) upsert an AAP Project and trigger a sync.
+This creates (or appends to) an Ansible project under `<project-id>/ansible-project/`. On the first module it creates the full skeleton (ansible.cfg, collections, inventory). On subsequent modules it adds the role and playbook.
 
-- ansible.cfg: `./ansible/deployments/nginx_multisite/ansible.cfg`
-- Collections requirements: `./ansible/deployments/nginx_multisite/collections/requirements.yml`
-- Inventory: `./ansible/deployments/nginx_multisite/inventory/hosts.yml`
-- Role: `./ansible/deployments/nginx_multisite/roles/nginx_multisite/`
-- Playbook: `./ansible/deployments/nginx_multisite/playbooks/run_nginx_multisite.yml`
+- ansible.cfg: `./<project-id>/ansible-project/ansible.cfg`
+- Collections requirements: `./<project-id>/ansible-project/collections/requirements.yml`
+- Inventory: `./<project-id>/ansible-project/inventory/hosts.yml`
+- Role: `./<project-id>/ansible-project/roles/nginx_multisite/`
+- Playbook: `./<project-id>/ansible-project/playbooks/run_nginx_multisite.yml`
+
+## Publish to AAP (Optional)
+
+```bash
+uv run app.py publish-aap \
+  --target-repo https://github.com/companyName/my-migration-project.git \
+  --target-branch main \
+  --project-id my-migration-project
+
+```
+
+This creates or updates an AAP Project pointing to the given repository and branch, then triggers a project sync.
 
 ## Notes
 
-Adding `--skip-git` makes the publish step **local-only** (no repository creation/push), and therefore the AAP sync step is skipped.
+Publishing is now split into two separate commands:
 
-example:
+- **`publish-project`** creates the local Ansible project structure. Run it once per migrated module.
+- **`publish-aap`** syncs a git repository to AAP. Run it after pushing your project to a git repository.
 
-```bash
-uv run app.py publish "nginx_multisite" --source-paths ./ansible/roles/nginx_multisite --skip-git
-```
-
-To **push to GitHub but skip the AAP sync**, run publish without `--skip-git` but do **not** set `AAP_CONTROLLER_URL` (AAP integration is enabled only when that variable is present). For
+To **skip the AAP sync**, simply omit the `publish-aap` step. The `publish-project` command is always local-only.

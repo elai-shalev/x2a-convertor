@@ -74,23 +74,33 @@ podman run --rm -ti \
 
 This will generate real Ansible code, primarily in `ansible/roles/nginx_multisite` with all details. When AAP env vars are set, it will also search your Private Automation Hub for reusable collections (see [AAP Discovery Agent]({% link concepts/export-agents.md %}#aap-discovery-agent-optional)).
 
-## Publish
+## Publish Project
 
 ```bash
 podman run --rm -ti \
   -v $(pwd)/:/app/source:Z \
-  -e GITHUB_TOKEN=$GITHUB_TOKEN \
+  quay.io/x2ansible/x2a-convertor:latest \
+  publish-project my-migration-project nginx_multisite
+```
+
+This creates (or appends to) an Ansible project under `<project-id>/ansible-project/`. On the first module it creates the full skeleton (ansible.cfg, collections, inventory). On subsequent modules it adds the role and playbook.
+
+- ansible.cfg: `./<project-id>/ansible-project/ansible.cfg`
+- Collections requirements: `./<project-id>/ansible-project/collections/requirements.yml`
+- Inventory: `./<project-id>/ansible-project/inventory/hosts.yml`
+- Role: `./<project-id>/ansible-project/roles/nginx_multisite/`
+- Playbook: `./<project-id>/ansible-project/playbooks/run_nginx_multisite.yml`
+
+## Publish to AAP (Optional)
+
+```bash
+podman run --rm -ti \
+  -v $(pwd)/:/app/source:Z \
   -e AAP_CONTROLLER_URL=$AAP_CONTROLLER_URL \
   -e AAP_ORG_NAME=$AAP_ORG_NAME \
   -e AAP_OAUTH_TOKEN=$AAP_OAUTH_TOKEN \
   quay.io/x2ansible/x2a-convertor:latest \
-  publish "nginx_multisite" --source-paths /app/source/ansible/roles/nginx_multisite --github-owner eloycoto --github-branch main
+  publish-aap --target-repo https://github.com/companyName/my-migration-project.git --target-branch main --project-id my-migration-project
 ```
 
-This will generate the deployments for the role, push it to GitHub, and (when AAP env vars are set) upsert an AAP Project and trigger a sync.
-
-- ansible.cfg: `./ansible/deployments/nginx_multisite/ansible.cfg`
-- Collections requirements: `./ansible/deployments/nginx_multisite/collections/requirements.yml`
-- Inventory: `./ansible/deployments/nginx_multisite/inventory/hosts.yml`
-- Role: `./ansible/deployments/nginx_multisite/roles/nginx_multisite/`
-- Playbook: `./ansible/deployments/nginx_multisite/playbooks/run_nginx_multisite.yml`
+This creates or updates an AAP Project pointing to the given repository and branch, then triggers a project sync.

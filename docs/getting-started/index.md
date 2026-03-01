@@ -19,7 +19,7 @@ Get X2A Convertor running and migrate your first cookbook.
 
 1. **Install**: See [Installation](installation.html)
 2. **Configure**: See [Configuration](configuration.html)
-3. **Run**: Five commands to migrate a cookbook
+3. **Run**: Migrate a cookbook step by step
 
 ```bash
 # 1. Initialize - scan repository and create migration plan
@@ -37,27 +37,24 @@ uv run app.py migrate \
   "Convert nginx cookbook"
 
 
-# 4. Publish - create Ansible project and optionally push to GitHub
-# Single role
-uv run app.py publish "nginx" \
-  --source-paths ./ansible/roles/nginx \
-  --github-owner <user-or-org> \
-  --github-branch main
+# 4. Publish - create Ansible project structure
+# First module (creates full project skeleton)
+uv run app.py publish-project my-migration-project nginx
 
-# Multiple roles
-uv run app.py publish "nginx" "apache" "mysql" \
-  --source-paths ./ansible/roles/nginx \
-  --source-paths ./ansible/roles/apache \
-  --source-paths ./ansible/roles/mysql \
-  --github-owner <user-or-org> \
-  --github-branch main
+# Additional modules (appends role and playbook)
+uv run app.py publish-project my-migration-project apache
+uv run app.py publish-project my-migration-project mysql
 
-# With custom collections and inventory (local only)
-uv run app.py publish "nginx" \
-  --source-paths ./ansible/roles/nginx \
+# With custom collections and inventory (first module only)
+uv run app.py publish-project my-migration-project nginx \
   --collections-file ./collections.yml \
-  --inventory-file ./inventory.yml \
-  --skip-git
+  --inventory-file ./inventory.yml
+
+# 5. (Optional) Sync to AAP - after pushing project to git
+uv run app.py publish-aap \
+  --target-repo https://github.com/<org>/my-migration-project.git \
+  --target-branch main \
+  --project-id my-migration-project
 ```
 
 ## Guides
