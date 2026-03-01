@@ -194,7 +194,7 @@ See [Human Checkpoints](../concepts/human-checkpoints.html#aap-collection-discov
 
 ### AAP Project Sync
 
-For publish phase AAP integration (creating projects in AAP Controller):
+For `publish-aap` command (creating/updating projects in AAP Controller):
 
 ```bash
 # Required
@@ -211,14 +211,6 @@ AAP_TIMEOUT_S=30.0
 
 Get OAuth token: See [AAP Token Authentication](https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.6/html/access_management_and_authentication/gw-token-based-authentication)
 
-## Publishing Configurations
-
-To publish a migrated cookbook, now Ansible Role, to Github, the github token is required.
-
-```bash
-GITHUB_TOKEN=<ghp_...>
-```
-
 ## Complete Configuration Examples
 
 ### Production (AWS Bedrock)
@@ -234,7 +226,6 @@ MAX_EXPORT_ATTEMPTS=5
 RECURSION_LIMIT=100
 MAX_TOKENS=8192
 TEMPERATURE=0.1
-GITHUB_TOKEN=<ghp_...>
 
 # AAP Integration (optional)
 AAP_CONTROLLER_URL=https://aap.example.com
@@ -258,7 +249,6 @@ LANGCHAIN_PROJECT=x2a-dev
 MAX_EXPORT_ATTEMPTS=3
 MAX_TOKENS=8192
 TEMPERATURE=0.1
-GITHUB_TOKEN=<ghp_...>
 ```
 
 ### Air-Gapped (Local Ollama)

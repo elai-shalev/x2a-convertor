@@ -324,48 +324,45 @@ ansible/nginx-multisite/
 
 ## Phase 4: Publish
 
-**Goal**: Get migrated Ansible roles into Ansible Automation Platform (AAP) via a GitOps flow.
+**Goal**: Package migrated Ansible roles into a deployable project and optionally sync to AAP.
+
+Publishing is split into two independent commands:
+
+1. **`publish-project`** — creates a local Ansible project structure (run once per module)
+2. **`publish-aap`** — syncs a git repository to AAP Controller (run after pushing to git)
 
 ### Process
 
-The publisher automates GitOps deployment by creating a deployable Ansible project structure and (optionally) pushing it to a new GitHub repository:
-
 ```mermaid
 flowchart TB
-    Start([Migrated Role]) --> Create[Create Deployment Structure]
-    Create --> Copy[Copy Roles]
-    Copy --> GenPlaybook[Generate Wrapper Playbooks]
-    GenPlaybook --> GenCfg[Generate ansible.cfg]
-    GenCfg --> GenColl[Generate collections/requirements.yml]
-    GenColl --> GenInv[Generate inventory/hosts.yml]
-    GenInv --> Verify[Verify All Files]
-    Verify --> Git{Skip git push?}
+    Start([Migrated Role]) --> FirstModule{First module?}
 
-    Git -->|Yes| Done([Local Deployment Ready])
-    Git -->|No| CreateRepo[Create GitHub Repository]
-    CreateRepo --> Commit[Commit Changes]
-    Commit --> Push[Push Branch]
-    Push --> PushOK{Push succeeded?}
-    PushOK -->|No| Summary[Display Summary]
-    PushOK -->|Yes| AAP{AAP enabled?}
-    AAP -->|No| Summary
-    AAP -->|Yes| SyncAAP[Sync to AAP Project]
-    SyncAAP --> Summary
-    Summary --> Done
+    FirstModule -->|Yes| Create[Create Project Skeleton]
+    Create --> CfgEtc[Generate ansible.cfg, collections, inventory]
+    CfgEtc --> CopyRole[Copy Role + Generate Playbook]
 
-    style Git fill:#fff3e0
-    style PushOK fill:#fff3e0
+    FirstModule -->|No| CopyRole
+
+    CopyRole --> Verify[Verify Files]
+    Verify --> Done1([publish-project Done])
+
+    Done1 -.->|User pushes to git| AAP{Run publish-aap?}
+    AAP -->|No| Done2([Done])
+    AAP -->|Yes| SyncAAP[Upsert AAP Project + Sync]
+    SyncAAP --> Done2
+
+    style FirstModule fill:#fff3e0
     style AAP fill:#fff3e0
-    style SyncAAP fill:#fff3e0
-    style Done fill:#e8f5e9
+    style Done1 fill:#e8f5e9
+    style Done2 fill:#e8f5e9
 ```
 
 ### Deployment Structure
 
-The publisher creates an Ansible project deployment at `<base-path>/ansible/deployments/{role}/` (or `ansible-project/` for multiple roles):
+`publish-project` creates an Ansible project at `<project-id>/ansible-project/`:
 
 ```
-deployments/{role}/
+<project-id>/ansible-project/
 ├── ansible.cfg
 ├── collections/requirements.yml
 ├── inventory/hosts.yml
@@ -373,14 +370,15 @@ deployments/{role}/
 └── playbooks/run_{role}.yml
 ```
 
+On the first module, the full skeleton is created. On subsequent modules, only the role directory and playbook are appended.
+
 ### Key Features
 
 - **Template-based generation**: Uses Jinja2 templates for consistent output
 - **Deterministic**: No LLM calls during generation for reproducible results
-- **GitOps-ready**: Automatically creates GitHub repositories
-- **AAP integration**: After a successful push, optionally upserts an AAP Project and triggers a Project Update (SCM sync) when `AAP_CONTROLLER_URL` is set
-- **Idempotent**: Handles existing repositories gracefully, fails on existing branches
-- **Summary output**: Displays files created, credentials needed, and repository location
+- **Incremental**: Add modules one at a time; skeleton is created once
+- **AAP integration**: Separate `publish-aap` command upserts an AAP Project and triggers a sync when ready
+- **Summary output**: Displays files created and project location
 
 ### What to Review
 
@@ -388,8 +386,7 @@ deployments/{role}/
 - [ ] Playbook references correct role
 - [ ] `collections/requirements.yml` matches the required collections
 - [ ] `inventory/hosts.yml` contains the intended inventory
-- [ ] Repository created and pushed successfully
-- [ ] AAP Project exists and syncs successfully (if enabled)
+- [ ] AAP Project exists and syncs successfully (if using `publish-aap`)
 - [ ] All credentials and execution instructions clear
 
 ## Parallel Workflows
