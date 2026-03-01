@@ -25,7 +25,7 @@ def docker_command(
     volume_mount: str,
 ) -> str:
     """Build a podman run command with the given env vars."""
-    parts = [f"podman run --rm -ti \\", f"  -v {volume_mount} \\"]
+    parts = ["podman run --rm -ti \\", f"  -v {volume_mount} \\"]
     for var in env_vars:
         parts.append(f"  -e {var} \\")
     parts.append(f"  {image} \\")
